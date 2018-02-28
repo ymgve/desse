@@ -1,7 +1,12 @@
-import socket, traceback, struct, base64, random, cStringIO, zlib
+import socket, traceback, struct, base64, random, cStringIO, zlib, select
 from time import gmtime, strftime
 
 from helpers import *
+
+SERVER_PORT_BOOTSTRAP = 18000
+SERVER_PORT_US = 18666
+SERVER_PORT_EU = 18667
+SERVER_PORT_JP = 18668
 
 class ImpSock(object):
     def __init__(self, sc, name):
@@ -108,14 +113,6 @@ class Server(object):
         self.playerSOS = {}
         self.playerPending = {}
 
-        self.dummycounter = 0
-        
-        testblue = {'playerLevel': '18', 'addMsgCateID': '0', 'mainMsgID': '0', 'qwcwb': '90', 'blockID': '20170', 'playerInfo': 'AAAAAQACTRAAAJ1wAAGHzAABEdb/////AAGNRAADDmwABJm8AAYcEAAAAAA1cCegAFQAaABvAG0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA===', 'isBlack': '2', 'angy': '1.630886', 'posz': '53.284927', 'posx': '17.506443', 'posy': '30.120308', 'qwclr': '0', 'messageID': '0', 'angx': '0.000000', 'characterID': 'notve0', 'angz': '0.000000', 'ver': '100'}
-        #testblue2 = {'playerLevel': '18', 'addMsgCateID': '0', 'mainMsgID': '0', 'qwcwb': '90', 'blockID': '20070', 'playerInfo': 'AAAAAQACTRAAAJ1wAAGHzAABEdb/////AAGNRAADDmwABJm8AAYcEAAAAAA1cCegAFQAaABvAG0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA===', 'isBlack': '2', 'angy': '1.630886', 'posz': '-53.031174', 'posx': '19.046143', 'posy': '30.120308', 'qwclr': '0', 'messageID': '0', 'angx': '0.000000', 'characterID': 'notvee0', 'angz': '0.000000', 'ver': '100'}
-
-        # self.activeSOS[self.SOSindex] = SOSData(testblue, self.SOSindex)
-        # self.SOSindex += 1
-        
         f = open("replayheaders.bin", "rb")
         while True:
             header = ReplayHeader()
@@ -128,6 +125,8 @@ class Server(object):
                 
             if (header.messageID, header.mainMsgID, header.addMsgCateID) != (0, 0, 0):
                 self.replayheaders[header.blockID].append(header)
+                
+        print "finished read replay headers"
         
         f = open("replaydata.bin", "rb")
         while True:
@@ -139,106 +138,121 @@ class Server(object):
             data = readcstring(f)
             
             self.replaydata[ghostID] = data
+            
+        print "finished read replay data"
                 
     def run(self):
-        gserver = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        gserver.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        gserver.bind(('', 18666))
-        gserver.listen(5)
+        servers = []
+        for port in (SERVER_PORT_BOOTSTRAP, SERVER_PORT_US, SERVER_PORT_EU, SERVER_PORT_JP):
+            server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            server.bind(('', port))
+            server.listen(5)
+            servers.append(server)
+        
         print "listening"
 
         while True:
             try:
-                client_sock, client_addr = gserver.accept()
+                readable, _, _ = select.select(servers, [], [])
+                ready_server = readable[0]
+                serverport = ready_server.getsockname()[1]
+                
+                client_sock, client_addr = ready_server.accept()
                 sc = ImpSock(client_sock, "client")
-                print "got connect from", client_addr
                 
                 req = sc.recv_line()
-                print repr(req)
+                print "got connect from", client_addr, "to", serverport, "request", repr(req)
                 
                 clientheaders = sc.recv_headers()
                         
                 cdata = sc.recv_all(int(clientheaders["Content-Length"]))
                 cdata = decrypt(cdata)
-                print repr(cdata)
-                print
                 
-                data = None
-                
-                if "login.spd" in req:
-                    cmd, data = self.handle_login(cdata)
+                if serverport == SERVER_PORT_BOOTSTRAP:
+                    data = open("info.ss", "rb").read()
                     
-                if "initializeCharacter.spd" in req:
-                    cmd, data = self.handle_charinit(cdata)
+                    res = self.prepare_response_bootstrap(data)
+                else:
+                    data = None
                     
-                if "getQWCData.spd" in req:
-                    cmd, data = self.handle_qwcdata(cdata)
+                    if "login.spd" in req:
+                        cmd, data = self.handle_login(cdata)
+                        
+                    if "initializeCharacter.spd" in req:
+                        cmd, data = self.handle_charinit(cdata)
+                        
+                    if "getQWCData.spd" in req:
+                        cmd, data = self.handle_qwcdata(cdata)
+                        
+                    if "getMultiPlayGrade.spd" in req:
+                        cmd = 0x28
+                        data = "0100000000000000000000000000000000000000000000000000000000".decode("hex")
                     
-                if "getMultiPlayGrade.spd" in req:
-                    cmd = 0x28
-                    data = "0100000000000000000000000000000000000000000000000000000000".decode("hex")
-                
-                if "getBloodMessageGrade.spd" in req:
-                    cmd = 0x29
-                    data = "0100000000".decode("hex")
+                    if "getBloodMessageGrade.spd" in req:
+                        cmd = 0x29
+                        data = "0100000000".decode("hex")
+                        
+                    if "getTimeMessage.spd" in req:
+                        cmd = 0x22
+                        data = "000000".decode("hex")
                     
-                if "getTimeMessage.spd" in req:
-                    cmd = 0x22
-                    data = "000000".decode("hex")
-                
-                if "getBloodMessage.spd" in req:
-                    cmd = 0x1f
-                    data = "00000000".decode("hex")
+                    if "getBloodMessage.spd" in req:
+                        cmd = 0x1f
+                        data = "00000000".decode("hex")
+                        
+                    if "addReplayData.spd" in req:
+                        cmd = 0x1d
+                        data = "01000000".decode("hex")
+                        
+                    if "getReplayList.spd" in req:
+                        cmd, data = self.handle_getReplayList(cdata)
                     
-                if "addReplayData.spd" in req:
-                    cmd = 0x1d
-                    data = "01000000".decode("hex")
+                    if "getReplayData.spd" in req:
+                        cmd, data = self.handle_getReplayData(cdata)
                     
-                if "getReplayList.spd" in req:
-                    cmd, data = self.handle_getReplayList(cdata)
-                
-                if "getReplayData.spd" in req:
-                    cmd, data = self.handle_getReplayData(cdata)
-                
-                if "getWanderingGhost.spd" in req:
-                    cmd, data = self.handle_getWanderingGhost(cdata)
+                    if "getWanderingGhost.spd" in req:
+                        cmd, data = self.handle_getWanderingGhost(cdata)
+                        
+                    if "setWanderingGhost.spd" in req:
+                        cmd, data = self.handle_setWanderingGhost(cdata)
+                        
+                    if "getSosData.spd" in req:
+                        cmd, data = self.handle_getSosData(cdata)
+                        
+                    if "addSosData.spd" in req:
+                        cmd, data = self.handle_addSosData(cdata)
+                        
+                    if "checkSosData.spd" in req:
+                        cmd, data = self.handle_checkSosData(cdata)
+                        
+                    if "outOfBlock.spd" in req:
+                        cmd, data = self.handle_outOfBlock(cdata)
+                        
+                    if "summonOtherCharacter.spd" in req:
+                        cmd, data = self.handle_summonOtherCharacter(cdata)
+                        
+                    if "initializeMultiPlay.spd" in req:
+                        cmd, data = 0x15, "\x01"
+                        
+                    if data == None:
+                        print repr(req)
+                        print repr(cdata)
+                        raise Exception("UNKNOWN CLIENT REQUEST")
+                        
+                    res = self.prepare_response(cmd, data)
+                    # print "sending"
+                    # print res
                     
-                if "setWanderingGhost.spd" in req:
-                    cmd, data = self.handle_setWanderingGhost(cdata)
-                    
-                if "getSosData.spd" in req:
-                    cmd, data = self.handle_getSosData(cdata)
-                    
-                if "addSosData.spd" in req:
-                    cmd, data = self.handle_addSosData(cdata)
-                    
-                if "checkSosData.spd" in req:
-                    cmd, data = self.handle_checkSosData(cdata)
-                    
-                if "outOfBlock.spd" in req:
-                    cmd, data = self.handle_outOfBlock(cdata)
-                    
-                if "summonOtherCharacter.spd" in req:
-                    cmd, data = self.handle_summonOtherCharacter(cdata)
-                    
-                if data == None:
-                    print repr(req)
-                    print repr(cdata)
-                    raise Exception("UNKNOWN CLIENT REQUEST")
-                    
-                res = self.prepare_response(cmd, data)
-                # print "sending"
-                # print res
-                
                 sc.sendall(res)
                 sc.close()
                 
             except KeyboardInterrupt:
-                sc.close()
-                gserver.close()
+                #sc.close()
+                #gserver.close()
                 raise
             except:
-                sc.close()
+                #sc.close()
                 traceback.print_exc()
             
             
@@ -422,9 +436,20 @@ class Server(object):
             
     
     def prepare_response(self, cmd, data):
-        data = chr(cmd) + struct.pack("<I", len(data)+5) + data
-        data = base64.b64encode(data) + "\n"
+        # The official servers were REALLY inconsistent with the data length field
+        # I just set it to what seems to be the correct value and hope for the best,
+        # has been working so far
+        data = chr(cmd) + struct.pack("<I", len(data) + 5) + data
         
+        # The newline at the end here is important for some reason
+        # - standard responses won't work without it
+        # - bootstrap response won't work WITH it
+        return self.add_headers(base64.b64encode(data) + "\n")
+
+    def prepare_response_bootstrap(self, data):
+        return self.add_headers(base64.b64encode(data))
+        
+    def add_headers(self, data):
         res  = "HTTP/1.1 200 OK\r\n"
         res += "Date: " + strftime("%a, %d %b %Y %H:%M:%S GMT", gmtime()) + "\r\n"
         res += "Server: Apache\r\n"
@@ -434,6 +459,6 @@ class Server(object):
         res += "\r\n"
         res += data
         return res
-
+        
 server = Server()
 server.run()
