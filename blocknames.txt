@@ -1,0 +1,58 @@
+-1|Loading Area
+-10079|Nexus
+20070|1-1 Boletarian Palace
+20071|1-1 Boletarian Palace Upper
+20072|1-1 Boletarian Palace Barracks
+20073|1-1 Boletarian Palace Back
+-20079|1-1 Phalanx
+20170|1-2 Bridge Lower
+20171|1-2 Bridge Upper
+-20179|1-2 Tower Knight
+20270|1-3 City Outer
+20271|1-3 City Inner
+-20279|1-4
+20370|1-4
+-20379|1-4
+60070|2-1 Stonefang Tunnel
+60071|2-1 Stonefang Tunnel
+60072|2-1 Stonefang Tunnel
+60073|2-1 Stonefang Tunnel
+-60079|2-1 Armor Spider
+60170|2-2 Tunnels
+60171|2-2 Cliffside
+60172|2-2 Bottom
+-60179|2-2 Flamelurker
+60270|2-3 Hallway
+-60279|2-3 Dragon God
+40070|3-1 Prison
+40071|3-1 Prison
+40072|3-1 Prison
+40073|3-1 Prison 
+40074|3-1 Prison
+-40079|3-1 Fool's Idol
+40170|3-2 Towers
+40171|3-2 Towers
+40172|3-2 Towers
+-40179|3-2 Maneater
+40270|3-3 inbetween
+1040271|3-3
+30170|4-1 Shrine of Storms
+30171|4-1 Shrine of Storms
+30172|4-1 Shrine of Storms
+30173|4-1 Shrine of Storms
+-30179|4-1 Adjudicator
+30270|4-2 Upper Stingray path
+30271|4-2 Central
+30272|4-2 Lower Stingray Path
+-30279|4-2 Old Hero
+30370|4-3 Storm King Approach
+-30379|4-3 Storm King
+50070|5-1 Valley of Defilement
+50071|5-1 Valley of Defilement
+-50079|5-1 Leechmonger
+50170|5-2
+50171|5-2
+50172|5-2
+-50179|5-2 Dirty Colossus
+50270|5-3
+-50279|5-3

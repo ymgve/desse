@@ -8,6 +8,11 @@ SERVER_PORT_US = 18666
 SERVER_PORT_EU = 18667
 SERVER_PORT_JP = 18668
 
+blocknames = {}
+for line in open("blocknames.txt", "rb"):
+    blockID, blockname = line.strip().split("|")
+    blocknames[int(blockID)] = blockname
+    
 class ImpSock(object):
     def __init__(self, sc, name):
         self.sc = sc
@@ -102,9 +107,71 @@ class SOSData(object):
         
         return res
 
-class Server(object):
+class Ghost(object):
+    def __init__(self, characterID, ghostBlockID, replayData):
+        self.characterID = characterID
+        self.ghostBlockID = ghostBlockID
+        self.replayData = replayData
+        
+class GhostManager(object):
     def __init__(self):
         self.ghosts = {}
+        
+    def handle_getWanderingGhost(self, params):
+        characterID = params["characterID"]
+        blockID = make_signed(int(params["blockID"]))
+        maxGhostNum = int(params["maxGhostNum"])
+        
+        cands = []
+        for ghost in self.ghosts.values():
+            if ghost.ghostBlockID == blockID:
+                cands.append(ghost)
+                
+        maxGhostNum = min(maxGhostNum, len(cands))
+        
+        res = struct.pack("<II", 0, maxGhostNum)
+        for ghost in random.sample(cands, maxGhostNum):
+            replay = base64.b64encode(ghost.replayData).replace("+", " ")
+            res += struct.pack("<I", len(replay))
+            res += replay
+
+        return 0x11, res
+        
+    def handle_setWanderingGhost(self, params):
+        characterID = params["characterID"]
+        ghostBlockID = make_signed(int(params["ghostBlockID"]))
+        posx = float(params["posx"])
+        posy = float(params["posy"])
+        posz = float(params["posz"])
+        replayData = decode_broken_base64(params["replayData"])
+        
+        try:
+            z = zlib.decompressobj()
+            data = z.decompress(replayData)
+            assert z.unconsumed_tail == ""
+            
+            sio = cStringIO.StringIO(data)
+            poscount, num1, num2 = struct.unpack(">III", sio.read(12))
+            #print "%08x %08x %08x" % (poscount, num1, num2)
+            for i in xrange(poscount):
+                posx, posy, posz, angx, angy, angz, num3, num4 = struct.unpack(">ffffffII", sio.read(32))
+                #print "%7.2f %7.2f %7.2f %7.2f %7.2f %7.2f %08x %08x" % (posx, posy, posz, angx, angy, angz, num3, num4)
+            unknowns = struct.unpack(">iiiiiiiiiiiiiiiiiiii", sio.read(4 * 20))
+            #print unknowns
+            playername = sio.read(24).decode("utf-16be").rstrip("\x00")
+            #print repr(playername)
+            
+            ghost = Ghost(characterID, ghostBlockID, replayData)
+            self.ghosts[characterID] = ghost
+        except:
+            print "bad data", repr(params)
+            traceback.print_exc()
+        
+        return 0x17, "\x01"
+    
+class Server(object):
+    def __init__(self):
+        self.GhostManager = GhostManager()
         self.replayheaders = {}
         self.replaydata = {}
         
@@ -174,6 +241,7 @@ class Server(object):
                     
                     res = self.prepare_response_bootstrap(data)
                 else:
+                    params = get_params(cdata)
                     data = None
                     
                     if "login.spd" in req:
@@ -212,10 +280,10 @@ class Server(object):
                         cmd, data = self.handle_getReplayData(cdata)
                     
                     if "getWanderingGhost.spd" in req:
-                        cmd, data = self.handle_getWanderingGhost(cdata)
+                        cmd, data = self.GhostManager.handle_getWanderingGhost(params)
                         
                     if "setWanderingGhost.spd" in req:
-                        cmd, data = self.handle_setWanderingGhost(cdata)
+                        cmd, data = self.GhostManager.handle_setWanderingGhost(params)
                         
                     if "getSosData.spd" in req:
                         cmd, data = self.handle_getSosData(cdata)
@@ -281,54 +349,6 @@ class Server(object):
             
         return 0x0e, data
         
-    def handle_getWanderingGhost(self, cdata):
-        params = get_params(cdata)
-        print params
-        blockID = params["blockID"]
-        if blockID not in self.ghosts:
-            data = struct.pack("<II", 0, 0)
-        else:
-            nghosts = min(len(self.ghosts[blockID]), 6)
-                
-            data = struct.pack("<II", 0, nghosts)
-            for i in xrange(nghosts):
-                replay = random.choice(self.ghosts[blockID])
-                replay = base64.b64encode(replay).replace("+", " ")
-                data += struct.pack("<I", len(replay))
-                data += replay
-    
-        return 0x11, data
-        
-    def handle_setWanderingGhost(self, cdata):
-        params = get_params(cdata)
-        blockID = params["ghostBlockID"]
-        
-        # try:
-            # replay = decode_broken_base64(params["replayData"])
-            # z = zlib.decompressobj()
-            # data = z.decompress(replay)
-            # assert z.unconsumed_tail == ""
-            
-            # sio = cStringIO.StringIO(data)
-            # poscount, num1, num2 = struct.unpack(">III", sio.read(12))
-            # print "%08x %08x %08x" % (poscount, num1, num2)
-            # for i in xrange(poscount):
-                # posx, posy, posz, angx, angy, angz, num3, num4 = struct.unpack(">ffffffII", sio.read(32))
-                # print "%7.2f %7.2f %7.2f %7.2f %7.2f %7.2f %08x %08x" % (posx, posy, posz, angx, angy, angz, num3, num4)
-            # unknowns = struct.unpack(">iiiiiiiiiiiiiiiiiiii", sio.read(4 * 20))
-            # print unknowns
-            # playername = sio.read(24).decode("utf-16be").rstrip("\x00")
-            # print repr(playername)
-            
-            # if blockID not in self.ghosts:
-                # self.ghosts[blockID] = []
-            # self.ghosts[blockID].append(replay)
-        # except:
-            # print "bad data", repr(params)
-            # traceback.print_exc()
-        
-        return 0x17, "01".decode("hex")
-    
     def handle_getReplayList(self, cdata):
         params = get_params(cdata)
         blockID = make_signed(int(params["blockID"]))
