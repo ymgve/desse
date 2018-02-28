@@ -12,6 +12,12 @@ blocknames = {}
 for line in open("blocknames.txt", "rb"):
     blockID, blockname = line.strip().split("|")
     blocknames[int(blockID)] = blockname
+
+messageids = {}
+for line in open("messageids.txt", "rb"):
+    id, text = line.strip().split("|", 1)
+    messageids[int(id)] = text
+
     
 class ImpSock(object):
     def __init__(self, sc, name):
@@ -247,11 +253,112 @@ class GhostManager(object):
         
         return 0x17, "\x01"
     
+class Message(object):
+    def __init__(self):
+        pass
+        
+    def unserialize(self, data):
+        sio = cStringIO.StringIO(data)
+        self.bmID = struct.unpack("<I", sio.read(4))[0]
+        self.characterID = readcstring(sio)
+        self.blockID, self.posx, self.posy, self.posz, self.angx, self.angy, self.angz = struct.unpack("<iffffff", sio.read(28))
+        self.messageID, self.mainMsgID, self.addMsgCateID, self.rating = struct.unpack("<iiii", sio.read(16))
+        assert sio.read() == ""
+        
+    def from_params(self, params, bmID):
+        self.bmID = bmID
+        self.characterID = params["characterID"]
+        self.blockID = make_signed(int(params["blockID"]))
+        self.posx = float(params["posx"])
+        self.posy = float(params["posy"])
+        self.posz = float(params["posz"])
+        self.angx = float(params["angx"])
+        self.angy = float(params["angy"])
+        self.angz = float(params["angz"])
+        self.messageID = int(params["messageID"])
+        self.mainMsgID = int(params["mainMsgID"])
+        self.addMsgCateID = int(params["addMsgCateID"])
+
+    def serialize(self):
+        res = ""
+        res += struct.pack("<I", self.bmID)
+        res += self.characterID + "\x00"
+        res += struct.pack("<iffffff", self.blockID, self.posx, self.posy, self.posz, self.angx, self.angy, self.angz)
+        res += struct.pack("<iiii", self.messageID, self.mainMsgID, self.addMsgCateID, self.rating)
+        return res
+
+class MessageManager(object):
+    def __init__(self):
+        self.blocks = {}
+        for blockID in blocknames:
+            self.blocks[blockID] = set()
+            
+        self.messages = {}
+        
+        f = open("messagedata.bin", "rb")
+        while True:
+            data = f.read(4)
+            if len(data) == 0:
+                break
+            sz = struct.unpack("<I", data)[0]
+            
+            msg = Message()
+            msg.unserialize(f.read(sz))
+            
+            self.blocks[msg.blockID].add(msg.bmID)
+            
+            self.messages[msg.bmID] = msg
+                
+        print "Loaded initial messages"
+        
+    def handle_getBloodMessage(self, params):
+        characterID = params["characterID"]
+        blockID = make_signed(int(params["blockID"]))
+        replayNum = int(params["replayNum"])
+        replayNum = min(replayNum, len(self.blocks[blockID]))
+        
+        print "Sending %d messages" % replayNum
+        
+        res = struct.pack("<I", replayNum)
+        for bmID in random.sample(self.blocks[blockID], replayNum):
+            res += self.messages[bmID].serialize()
+            
+        return 0x1f, res
+        
+    def handle_addBloodMessage(self, params):
+        # msg = Message()
+        # msg.from_params(self, self.bmID)
+        # blockID = make_signed(int(params["blockID"]))
+        # replayNum = int(params["replayNum"])
+    
+        return 0x1d, "\x01"
+        
+    def handle_updateBloodMessageGrade(self, params):
+        bmID = int(params["bmID"])
+        msg = self.messages[bmID]
+        
+        msg.rating += 1
+        
+        if msg.mainMsgID in messageids:
+            if msg.messageID in messageids:
+                extra = messageids[msg.messageID]
+            else:
+                extra = "[%d]" % msg.messageID
+                
+            message = messageids[msg.mainMsgID].replace("***", extra)
+            prettymessage = "%8d %8d %-20s %s %d" % (msg.bmID, msg.blockID, msg.characterID, message, msg.rating)
+            
+        else:
+            prettymessage = "%8d %8d %-20s [%d] [%d] %d" % (msg.bmID, msg.blockID, msg.characterID, msg.messageID, msg.mainMsgID, msg.rating)
+        print "recommended", prettymessage
+        
+        return 0x2a, "\x01"
+        
 class Server(object):
     def __init__(self):
         self.GhostManager = GhostManager()
         self.SOSManager = SOSManager()
-        
+        self.MessageManager = MessageManager()
         self.replayheaders = {}
         self.replaydata = {}
         
@@ -340,13 +447,21 @@ class Server(object):
                         cmd = 0x22
                         data = "000000".decode("hex")
                     
-                    if "getBloodMessage.spd" in req:
                         cmd = 0x1f
                         data = "00000000".decode("hex")
                         
                     if "addReplayData.spd" in req:
                         cmd = 0x1d
                         data = "01000000".decode("hex")
+                        
+                    if "getBloodMessage.spd" in req:
+                        cmd, data = self.MessageManager.handle_getBloodMessage(params)
+                        
+                    if "addBloodMessage.spd" in req:
+                        cmd, data = self.MessageManager.handle_addBloodMessage(params)
+                        
+                    if "updateBloodMessageGrade.spd" in req:
+                        cmd, data = self.MessageManager.handle_updateBloodMessageGrade(params)
                         
                     if "getReplayList.spd" in req:
                         cmd, data = self.handle_getReplayList(cdata)

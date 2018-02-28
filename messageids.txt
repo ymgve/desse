@@ -1,0 +1,656 @@
+10010|Beware of *** ahead.
+10020|Be wary of the enemy's ***.
+11001|There's *** ahead.
+11002|A *** lies in wait ahead.
+11003|You'll find *** past here.
+11004|You'll get *** from the next foe.
+11005|If you ***, you can proceed.
+12001|Use *** on the next enemy.
+12002|Don't bother with ***.
+12003|The next enemy's weakness is ***.
+13001|Don't go forward without ***.
+13002|You'll need a Soul Level of *** ahead.
+13003|*** should go here first.
+13004|*** should try this area later.
+14001|Watch out.
+14002|Listen well.
+14003|Think hard.
+14004|Remember...
+14005|Don't stop!
+14006|Run straight through.
+14007|Take a step forward.
+14008|Watch yourself.
+14009|This is it.
+14010|The true Demon's Souls starts here.
+14011|Welcome!
+14012|Hi!
+14013|Farewell!
+14014|Best of luck to you.
+14015|There are demons nearby.
+14016|It's safe here.
+14017|It's not safe here.
+14018|You can summon here.
+14019|Requesting a challenger...
+14020|I'm in trouble--please recommend this message!
+14021|Write more messages!
+14022|Beware of false messages.
+14023|Don't attack!
+14024|Attack!
+14025|I've got a good item...
+14026|If you press onward...
+14027|If you jump down from here...
+14028|Behind you!
+14029|If you read this message...
+14030|I'm lost...
+14031|This place again...?
+14032|Why is it always...
+14033|My heart's breaking...
+14034|Now I've done it...
+14035|I want to go home...
+14036|I want to be resurrected...
+14037|I've been in Soul form for so long...
+14038|If I only had some friends...
+14039|I told you so.
+14040|This is no time to read messages!
+14041|Did you think there'd be a hint?
+14042|The answer is within you.
+15001|Item
+15002|Footsteps
+15003|At your feet
+15004|Head
+15005|Safe place
+15006|Good guy
+15007|Crossbow
+15008|At some point...
+15009|Someday...
+15010|One-way road
+15011|Nasty guy
+15012|Up
+15013|Ascending stairs
+15014|Ascending ladder
+15015|Movement
+15016|Cloudstone
+15017|Liar
+15018|Singing voice
+15019|Luck
+15020|While casting...
+15021|Sharpstone
+15022|Plague
+15023|Beware the plague
+15024|Ed's Grindstone
+15025|MP recovery item
+15026|Ranged attack
+15027|Large axe
+15028|Large shield
+15029|Large hammer
+15030|Strong attack
+15031|Coward
+15032|Knockback
+15033|Try falling through...
+15034|Pit trap
+15035|Axe
+15036|Lure it out
+15037|Yourself
+15038|While turning...
+15039|Dodge
+15040|HP recovery item
+15041|While recovering...
+15042|Fist weapon
+15043|Firebomb
+15044|Key
+15045|If you get the key...
+15046|Hidden passage
+15047|Single-handed
+15048|Katana
+15049|Divide and conquer
+15050|Paralysis
+15051|Archstone
+15052|Shard of Archstone
+15053|Widow's Lotus
+15054|Hunter
+15055|Deceptive cuteness
+15056|Poor guy
+15057|Cuteness
+15058|Observation
+15059|Misunderstanding
+15060|Willpower
+15061|Dangerous foe
+15062|Knight
+15063|Miracle
+15064|Royalty
+15065|Royal Lotus
+15066|Valuable item
+15067|Valuable recovery item
+15068|Valuable ore
+15069|Valuable treasure
+15070|Valuable weapon
+15071|Valuable armor
+15072|Valuable ring
+15073|Carelessness
+15074|Formidable foe
+15075|Critical attack
+15076|Curved sword
+15077|Twinkly stuff
+15078|Spiderstone
+15079|Darkness
+15080|Black Phantom
+15081|Black Turpentine
+15082|Moonstone
+15083|Bloodstain
+15084|Crystal Lizard
+15085|Kick
+15086|Primeval Demon
+15087|After attacking...
+15088|During your attack...
+15089|Hardstone
+15090|Ore
+15091|In your heart
+15092|Terrifying foe
+15093|Pole weapon
+15094|If you go on ahead...
+15095|Rapier
+15096|Slash attack
+15097|Battle of attrition
+15098|Confident one
+15099|Down
+15100|Descending stairs
+15101|Descending ladder
+15102|Thrust attack
+15103|Stealthy footsteps
+15104|Perimeter
+15105|V.I.P.
+15106|Bleeding
+15107|Bleeding resistance
+15108|Front
+15109|Item burden
+15110|Beginner
+15111|Sticky White Stuff
+15112|True love
+15113|Priest
+15114|Temple Knight
+15115|Mercurystone
+15116|Marrowstone
+15117|Suckerstone
+15118|Overhead
+15119|Stamina
+15120|World Tendency
+15121|Great view
+15122|Below
+15123|Narrow corridor
+15124|Preemptive strike
+15125|Reinforcement
+15126|Equipment burden
+15127|Soul
+15128|Soul drain
+15129|If Soul tendency is black...
+15130|If Soul tendency is white...
+15131|Soul Remains
+15132|Side
+15133|Sniper's perch
+15134|Standard attack
+15135|Large sword
+15136|Horde of foes
+15137|Treasure
+15138|Blunt attack
+15139|Barrage attack
+15140|Shield
+15141|Guard
+15142|Guard break
+15143|Dagger
+15144|Power push
+15145|Terrain
+15146|Challenger
+15147|Straight sword
+15148|Darkmoonstone
+15149|Hammer
+15150|Strong weapon
+15151|Tough guy
+15152|Adversary
+15153|Escape
+15154|Thief
+15155|Poison
+15156|Very large sword
+15157|Poison swamp
+15158|Poison resistance
+15159|Anywhere
+15160|Closed door
+15161|Closed gate
+15162|Rush
+15163|Projectile
+15164|Door
+15165|Greystone
+15166|Escape route
+15167|Remaining HP
+15168|Remaining MP
+15169|Rear
+15170|Back Side
+15171|Stone of Ephemeral Eyes
+15172|Pincer attack
+15173|Chest
+15174|Parry
+15175|Savage
+15176|Sparkly
+15177|Light
+15178|Faintstone
+15179|Left
+15180|Counterclockwise
+15181|Open area
+15182|Sneak attack
+15183|Intense pursuit
+15184|Weapon
+15185|Dead end
+15186|Corrosion
+15187|Staggering attack
+15188|Bolt
+15189|Soldier
+15190|Soldier's Lotus
+15191|Veteran
+15192|If you disguise yourself...
+15193|Strange item
+15194|Strange recovery item
+15195|Strange ore
+15196|Strange foe
+15197|Strange weapon
+15198|Strange armor
+15199|Strange ring
+15200|Armor
+15201|Roar
+15202|Wanderer
+15203|Howl
+15204|Other
+15205|Fire
+15206|Fire defense
+15207|Flame weapon
+15208|Magician
+15209|Ambush
+15210|Turpentine
+15211|Spell
+15212|Magic defense
+15213|Magic weapon
+15214|Trick road
+15215|Invisible foe
+15216|Right
+15217|Clockwise
+15218|Augite of Guidance
+15219|Clearstone
+15220|Illusion
+15221|Ignore
+15222|Message
+15223|Merchant
+15224|Sounds
+15225|Gate
+15226|Arrow
+15227|Bladestone
+15228|Spear
+15229|Friend
+15230|Ring
+15231|Bow
+15232|Lava
+15233|Meltstone
+15234|Pay attention
+15235|Weak guy
+15236|Fall
+15237|Rhythm
+15238|Dragonstone
+15239|Two-handed attack
+15240|Lever
+15241|If you use the lever...
+15242|Combo attack
+15243|After combo
+15244|During combo
+15245|Crossroads
+15246|Trap
+30001|get the key
+30002|use the lever
+30003|have white Soul tendency
+30004|have black Soul tendency
+30005|press on
+30006|keep trying
+30007|don't give up
+30008|disguise yourself
+33001|a trap
+33003|the ceiling
+33004|the floor
+33005|the rear area
+33006|a fall
+33007|the bloodstain
+33008|the message
+33009|a World Tendency event
+33010|the poison swamp
+33011|the lava
+33012|the crossroads
+33013|a trick road
+33014|the sounds
+33015|the footsteps
+33016|the singing voice
+33017|the darkness
+33018|the light
+33019|a distraction
+33020|not using caution
+33021|misunderstanding what's
+33022|an illusion
+33023|the liar
+33024|the adversary
+33025|the formidable foe
+33026|the horde of foes
+33027|the dangerous foe
+33028|the invisible foe
+33029|the bizarre foe
+33030|the terrifying foe
+33031|the cute foe
+33032|the Black Phantom
+33033|the bow-users
+33034|ranged attacks
+33035|the spell-users
+33036|the miracle-users
+33037|fire
+33038|bleeding
+33039|poison
+33040|plague
+33041|paralysis
+33042|corrosion
+33043|Soul drain
+33044|your remaining HP
+33045|your remaining MP
+33046|your stamina
+33047|your equipment burden
+33048|your item burden
+34001|ambush
+34002|sneak attack
+34003|barrage
+34004|reinforcements
+34005|escape
+34006|intense pursuit
+34007|movement
+34008|rhythm
+34009|perimeter
+34010|terrain
+34011|strong attacks
+34012|critical attacks
+34013|combo attacks
+34014|rush
+34015|staggering attacks
+34016|guard break
+34017|evasion
+34018|guard
+34019|parries
+34020|knockback
+34021|kick
+34022|roar
+34023|howl
+34024|bows
+34025|ranged attacks
+34026|spells
+34027|miracles
+34028|fire attacks
+34029|bloodletting
+34030|poison
+34031|plague
+34032|paralysis
+34033|decay
+34034|Soul drain
+34035|cuteness
+40001|traps
+40002|treasure
+40003|valuable treasure
+40004|keys
+40005|an Archstone
+40006|bloodstains
+40007|messages
+40008|a lever
+40009|a door
+40010|a gate
+40011|a closed door
+40012|a closed gate
+40013|an escape route
+40014|a dead end
+40015|a one-way road
+40016|a hidden passage
+40017|a pit trap
+40018|a fall
+40019|ascending stairs
+40020|descending stairs
+40021|a ladder up
+40022|a ladder down
+40023|a narrow place
+40024|an open place
+40025|a safe place
+40026|a sniper's perch
+40027|a great view
+40101|merchant
+40102|V.I.P.
+40103|friend
+40104|good guy
+40105|poor guy
+40106|bad guy
+40107|tough guy
+40108|weak guy
+40109|liar
+40110|villain
+40111|formidable foe
+40112|horde of foes
+40113|dangerous foe
+40114|hidden foe
+40115|strange foe
+40116|terrifying foe
+40117|cute foe
+40118|Black Phantom
+40119|Crystal Lizard
+40120|Primeval Demon
+40201|a weapon
+40202|armor
+40203|a ring
+40204|ore
+40205|a recovery item
+40206|an item
+40207|Souls
+40208|a valuable weapon
+40209|valuable armor
+40210|a valuable ring
+40211|valuable ore
+40212|a valuable recovery item
+40213|a valuable item
+40214|a strange weapon
+40215|strange armor
+40216|a strange ring
+40217|strange ore
+40218|a strange recovery item
+40219|a strange item
+40220|a Hardstone
+40221|a Sharpstone
+40222|a Clearstone
+40223|a Greystone
+40224|a Bladestone
+40225|a Dragonstone
+40226|a Suckerstone
+40227|a Mercurystone
+40228|a Marrowstone
+40229|a Spiderstone
+40230|a Moonlightstone
+40231|a Darkmoonstone
+40232|a Faintstone
+40233|a Cloudstone
+40234|a Meltstone
+40235|sparkly things
+40236|twinkly things
+40237|true love
+40301|blunt attacks
+40302|slash attacks
+40303|pierce attacks
+40304|one-handed attacks
+40305|two-handed attacks
+40306|daggers
+40307|straight swords
+40308|large swords
+40309|very large swords
+40310|curved swords
+40311|katanas
+40312|rapiers
+40313|axes
+40314|large axes
+40315|hammers
+40316|large hammers
+40317|fist weapons
+40318|spears
+40319|pole weapons
+40320|strong weapons
+40321|magic weapons
+40322|flame weapons
+40323|bows
+40324|arrows
+40325|crossbows
+40326|bolts
+40327|projectiles
+40328|spells
+40329|miracles
+40330|shields
+40331|large shields
+40332|fire
+40333|bleed attacks
+40334|poison
+40335|plague
+40336|decay
+40337|Soul drain
+40338|staggering attacks
+40339|guard breaks
+40340|dodges
+40341|shield guards
+40342|parries
+40343|knockback attacks
+40344|clockwise dodges
+40345|counterclockwise dodges
+40346|pincer attacks
+40347|divide and conquer tactics
+40348|luring tactics
+40349|power pushes
+40350|preemptive strikes
+40351|standard attacks
+40352|attrition
+40353|observation
+40354|stealthy footsteps
+40355|nothing
+40356|willpower
+40357|luck
+40358|In a pinch
+40501|its head
+40502|its feet
+40503|its back
+40504|its chest
+40505|its front
+40506|its side
+40507|its backside
+40508|during its attack
+40509|after its attack
+40510|during its combo
+40511|after its combo
+40512|during its recovery
+40513|when it turns
+40514|when it chants
+40515|above
+40516|below
+40517|to the left
+40518|to the right
+40519|not what you think
+40520|anywhere
+40521|in your heart
+40522|you
+40601|a dagger
+40602|a straight sword
+40603|a large sword
+40604|a very large sword
+40605|a curved sword
+40606|a katana
+40607|a rapier
+40608|an axe
+40609|a large axe
+40610|a hammer
+40611|a large hammer
+40612|a fist weapon
+40613|a spear
+40614|a pole weapon
+40615|a strong weapon
+40616|a magic weapon
+40617|a flame weapon
+40618|a bow
+40619|arrows
+40620|a crossbow
+40621|bolts
+40622|projectiles
+40623|spells
+40624|miracles
+40625|a shield
+40626|a large shield
+40627|spell resistance
+40628|fire defense
+40629|bleed resistance
+40630|poison resistance
+40631|plague resistance
+40632|recovery items
+40633|a Soldier's Lotus
+40634|a Royal Lotus
+40635|a Widow's Lotus
+40636|MP recovery items
+40637|a grindstone
+40638|a Stone of Ephemeral Eyes
+40639|a Splinter of Archstone
+40640|an Augite of Guidance
+40641|Soul remains
+40642|Turpentine
+40643|Black Turpentine
+40644|Sticky White Stuff
+40645|Firebombs
+40701|10
+40702|20
+40703|30
+40704|40
+40705|50
+40706|60
+40707|70
+40708|80
+40709|90
+40710|100
+40711|110
+40712|120
+40713|130
+40714|140
+40715|150
+40716|160
+40717|170
+40718|180
+40719|190
+40720|200
+40721|210
+40722|220
+40723|230
+40724|240
+40725|250
+40726|260
+40727|270
+40728|280
+40729|290
+40730|300
+40731|310
+40732|320
+40733|330
+40734|340
+40735|350
+40736|360
+40737|370
+40738|380
+40739|390
+40740|400
+40801|Beginners
+40802|Veterans
+40803|Confident ones
+40804|Cowards
+40805|Challengers
+40806|Soldiers
+40807|Knights
+40808|Hunters
+40809|Priests
+40810|Magicians
+40811|Wanderers
+40812|Barbarians
+40813|Thieves
+40814|Temple Knights
+40815|Royalty
