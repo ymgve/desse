@@ -71,7 +71,7 @@ class ImpSock(object):
 class SOSData(object):
     def __init__(self, params, sosID):
         self.sosID = sosID
-        self.blockID = int(params["blockID"])
+        self.blockID = make_signed(int(params["blockID"]))
         self.characterID = params["characterID"]
         self.posx = float(params["posx"])
         self.posy = float(params["posy"])
@@ -106,6 +106,84 @@ class SOSData(object):
         res += struct.pack("<IIb", self.qwcwb, self.qwclr, self.isBlack)
         
         return res
+
+class SOSManager(object):
+    def __init__(self):
+        self.SOSindex = 1
+        self.activeSOS = {}
+        self.activeSOS[SERVER_PORT_US] = {}
+        self.activeSOS[SERVER_PORT_EU] = {}
+        self.activeSOS[SERVER_PORT_JP] = {}
+        
+        self.playerPending = {}
+
+    def handle_getSosData(self, params, serverport):
+        # TODO: limit number of SOS to what the client requests
+        
+        blockID = make_signed(int(params["blockID"]))
+        sosNum = int(params["sosNum"])
+        sosList = params["sosList"].split("a0a")
+        sos_known = []
+        sos_new = []
+        
+        for sos in self.activeSOS[serverport].values():
+            if sos.blockID == blockID:
+                if str(sos.sosID) in sosList:
+                    sos_known.append(struct.pack("<I", sos.sosID))
+                    print "adding known SOS", sos.sosID
+                else:
+                    sos_new.append(sos.serialize())
+                    print "adding new SOS", sos.sosID
+    
+        data =  struct.pack("<I", len(sos_known)) + "".join(sos_known)
+        data += struct.pack("<I", len(sos_new)) + "".join(sos_new)
+        print "sending", repr(data)
+        
+        return 0x0f, data
+
+    def handle_addSosData(self, params, serverport):
+        sos = SOSData(params, self.SOSindex)
+        self.SOSindex += 1
+        
+        self.activeSOS[serverport][sos.characterID] = sos
+        
+        print "added SOS, current list", self.activeSOS
+        return 0x0a, "\x01"
+
+    def handle_checkSosData(self, params, serverport):
+        characterID = params["characterID"]
+        
+        print characterID, self.playerPending
+        if characterID in self.playerPending:
+            print "GOT DATA, SENDING"
+            data = self.playerPending[characterID]
+            del self.playerPending[characterID]
+        else:
+            print "no data"
+            data = "\x00"
+                    
+        return 0x0b, data
+        
+    def handle_summonOtherCharacter(self, params, serverport):
+        ghostID = int(params["ghostID"])
+        NPRoomID = params["NPRoomID"]
+        print "ghostID", ghostID, repr(NPRoomID), self.activeSOS
+        
+        for sos in self.activeSOS[serverport].values():
+            if sos.sosID == ghostID:
+                print "adding to", repr(sos.characterID)
+                self.playerPending[sos.characterID] = NPRoomID
+                break
+        
+        return 0x0a, "\x01"
+            
+    def handle_outOfBlock(self, params, serverport):
+        characterID = params["characterID"]
+        if characterID in self.activeSOS[serverport]:
+            print "removing old SOS"
+            del self.activeSOS[serverport][characterID]
+            
+        return 0x15, "\x01"
 
 class Ghost(object):
     def __init__(self, characterID, ghostBlockID, replayData):
@@ -172,14 +250,11 @@ class GhostManager(object):
 class Server(object):
     def __init__(self):
         self.GhostManager = GhostManager()
+        self.SOSManager = SOSManager()
+        
         self.replayheaders = {}
         self.replaydata = {}
         
-        self.activeSOS = {}
-        self.SOSindex = 1
-        self.playerSOS = {}
-        self.playerPending = {}
-
         f = open("replayheaders.bin", "rb")
         while True:
             header = ReplayHeader()
@@ -286,19 +361,19 @@ class Server(object):
                         cmd, data = self.GhostManager.handle_setWanderingGhost(params)
                         
                     if "getSosData.spd" in req:
-                        cmd, data = self.handle_getSosData(cdata)
+                        cmd, data = self.SOSManager.handle_getSosData(params, serverport)
                         
                     if "addSosData.spd" in req:
-                        cmd, data = self.handle_addSosData(cdata)
+                        cmd, data = self.SOSManager.handle_addSosData(params, serverport)
                         
                     if "checkSosData.spd" in req:
-                        cmd, data = self.handle_checkSosData(cdata)
+                        cmd, data = self.SOSManager.handle_checkSosData(params, serverport)
                         
                     if "outOfBlock.spd" in req:
-                        cmd, data = self.handle_outOfBlock(cdata)
+                        cmd, data = self.SOSManager.handle_outOfBlock(params, serverport)
                         
                     if "summonOtherCharacter.spd" in req:
-                        cmd, data = self.handle_summonOtherCharacter(cdata)
+                        cmd, data = self.SOSManager.handle_summonOtherCharacter(params, serverport)
                         
                     if "initializeMultiPlay.spd" in req:
                         cmd, data = 0x15, "\x01"
@@ -325,12 +400,8 @@ class Server(object):
             
             
     def handle_login(self, cdata):
-        motd = "\x01\x01Hello from %x fake server!"
-        #data = "\x01" + struct.pack(">I", len(motd) + 4) + motd + "\x00"
-        data = motd + "\x00"
-        
-        #data = '\x01\xf3\x02\x00\x00\x01\x01Conclusion of Online Service for Lolll\xe2\x80\x99s Souls\r\n\r\nOnline service for Demon\xe2\x80\x99s Souls will conclude \r\non February 28, 2018. \r\nWe are very thankful for the countless players \r\nwho have enjoyed our title since its release back \r\nin 2010.\r\n\r\nEven after the online service concludes, \r\nyou will continue to be able to play the game offline. \r\nWe have listed the features that will cease functioning \r\nbelow.\r\n\r\nDemon\xe2\x80\x99s Souls Online Service Conclusion\r\nFebruary 28, 2018\r\n8:00 (UTC)\r\n\r\nFeatures That Will Cease: \r\nMultiplayer \r\n(cooperative, invading other worlds, challenge play)\r\nHint messages\r\nOther players\xe2\x80\x99 bloodstains\r\nWandering apparitions\r\nViewing rankings\r\n\r\nAgain, thank youto all players who have enjoyed \r\nDemon\xe2\x80\x99s Souls over the years\x00\x00'
-        return 0x01, data
+        motd = "\x01\x01Welcome to ymgve's test server!\r\nMultiplayer might be working now!"
+        return 0x01, motd + "\x00"
         
     def handle_charinit(self, cdata):
         params = get_params(cdata)
@@ -372,89 +443,10 @@ class Server(object):
             
         return 0x1e, data
         
-    def handle_addSosData(self, cdata):
-        params = get_params(cdata)
-        sos = SOSData(params, self.SOSindex)
-        self.SOSindex += 1
-        
-        if sos.characterID in self.playerSOS:
-            print "removing old SOS"
-            oldsos = self.playerSOS[sos.characterID]
-            del self.activeSOS[oldsos.sosID]
-            del self.playerSOS[oldsos.characterID]
-            
-        self.activeSOS[sos.sosID] = sos
-        self.playerSOS[sos.characterID] = sos
-        
-        print "added SOS, current list", self.activeSOS, self.playerSOS
-        return 0x0a, "\x01"
-        
-    def handle_getSosData(self, cdata):
-        # blockID=20370&maxSosNum=10&Black=5&Invate=5&sosNum=0&sosList=&playerLevelMax=83&playerLevelMin=51&BlackMax=83&BlackMin=51&InvateMax=65&InvateMin=49&ver=100&
-        params = get_params(cdata)
-        blockID = int(params["blockID"])
-        sosNum = int(params["sosNum"])
-        sosList = params["sosList"].split("a0a")
-        sos_known = []
-        sos_new = []
-        
-        for sos in self.activeSOS.values():
-            if sos.blockID == blockID:
-                if str(sos.sosID) in sosList:
-                    sos_known.append(struct.pack("<I", sos.sosID))
-                    print "adding known SOS", sos.sosID
-                else:
-                    sos_new.append(sos.serialize())
-                    print "adding new SOS", sos.sosID
-    
-        data =  struct.pack("<I", len(sos_known)) + "".join(sos_known)
-        data += struct.pack("<I", len(sos_new)) + "".join(sos_new)
-        print "sending", repr(data)
-        
-        return 0x0f, data
-
-    def handle_checkSosData(self, cdata):
-        params = get_params(cdata)
-        characterID = params["characterID"]
-        
-        print characterID, self.playerPending
-        if characterID in self.playerPending:
-            print "GOT DATA, SENDING"
-            data = self.playerPending[characterID]
-            del self.playerPending[characterID]
-        else:
-            print "no data"
-            data = "\x00"
-                    
-        return 0x0b, data
-        
-    def handle_outOfBlock(self, cdata):
-        params = get_params(cdata)
-        characterID = params["characterID"]
-        if characterID in self.playerSOS:
-            print "removing old SOS"
-            oldsos = self.playerSOS[characterID]
-            del self.activeSOS[oldsos.sosID]
-            del self.playerSOS[oldsos.characterID]
-            
-        return 0x15, "\x01"
-        
 # 'POST /cgi-bin/summonOtherCharacter.spd HTTP/1.1'
 # 'ghostID=1234564&NPRoomID=/////05YUlYFFQyAAAABAQAAAAAEgAAAAgEAAAAAAIAAAAYBAAAAAAAAAAAAAQAAACcVAAAAAQEAAABOJQAAAAIBAAAAdTUAAAADAQAAAJxFAAAABAEAAADDVQAAAAUBAAAA6m
 # UAAAAGAQAAARF1AAAABwEAAAE4hQAAAAgEAAB5AG0AZwB2AGUAAAB5AG0AZwB2AGUAAAAQAAAAAAAAAAAAAQACAAB8/Q===??&ver=100&\x00'
 
-    def handle_summonOtherCharacter(self, cdata):
-        params = get_params(cdata)
-        ghostID = int(params["ghostID"])
-        print "ghostID", ghostID, self.activeSOS
-        if ghostID in self.activeSOS:
-            sos = self.activeSOS[ghostID]
-            print "adding to", repr(sos.characterID)
-            self.playerPending[sos.characterID] = params["NPRoomID"]
-        
-        return 0x0a, "\x01"
-            
-    
     def prepare_response(self, cmd, data):
         # The official servers were REALLY inconsistent with the data length field
         # I just set it to what seems to be the correct value and hope for the best,
