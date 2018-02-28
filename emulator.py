@@ -278,6 +278,7 @@ class Message(object):
         self.messageID = int(params["messageID"])
         self.mainMsgID = int(params["mainMsgID"])
         self.addMsgCateID = int(params["addMsgCateID"])
+        self.rating = 0
 
     def serialize(self):
         res = ""
@@ -287,11 +288,28 @@ class Message(object):
         res += struct.pack("<iiii", self.messageID, self.mainMsgID, self.addMsgCateID, self.rating)
         return res
 
+    def __str__(self):
+        if self.mainMsgID in messageids:
+            if self.messageID in messageids:
+                extra = messageids[self.messageID]
+            else:
+                extra = "[%d]" % self.messageID
+                
+            message = messageids[self.mainMsgID].replace("***", extra)
+            prettymessage = "%8d %8d %-20s %s %d" % (self.bmID, self.blockID, self.characterID, message, self.rating)
+            
+        else:
+            prettymessage = "%8d %8d %-20s [%d] [%d] %d" % (self.bmID, self.blockID, self.characterID, self.messageID, self.mainMsgID, self.rating)
+
+        return prettymessage
+        
 class MessageManager(object):
     def __init__(self):
         self.blocks = {}
+        self.legacyblocks = {}
         for blockID in blocknames:
             self.blocks[blockID] = set()
+            self.legacyblocks[blockID] = set()
             
         self.messages = {}
         
@@ -305,33 +323,58 @@ class MessageManager(object):
             msg = Message()
             msg.unserialize(f.read(sz))
             
-            self.blocks[msg.blockID].add(msg.bmID)
+            self.legacyblocks[msg.blockID].add(msg.bmID)
             
             self.messages[msg.bmID] = msg
                 
         print "Loaded initial messages"
         
+        self.bmID = 1000000000
+        
     def handle_getBloodMessage(self, params):
         characterID = params["characterID"]
         blockID = make_signed(int(params["blockID"]))
         replayNum = int(params["replayNum"])
-        replayNum = min(replayNum, len(self.blocks[blockID]))
         
-        print "Sending %d messages" % replayNum
-        
-        res = struct.pack("<I", replayNum)
-        for bmID in random.sample(self.blocks[blockID], replayNum):
-            res += self.messages[bmID].serialize()
+        to_send = []
+        # first get non-legacy messages
+        nummsg = min(replayNum, len(self.blocks[blockID]))
+        for bmID in random.sample(self.blocks[blockID], nummsg):
+            to_send.append(self.messages[bmID].serialize())
             
+        numlegacy = min(replayNum - nummsg, len(self.legacyblocks[blockID]))
+        for bmID in random.sample(self.legacyblocks[blockID], numlegacy):
+            to_send.append(self.messages[bmID].serialize())
+        
+        res = struct.pack("<I", nummsg + numlegacy) + "".join(to_send)
+            
+        print "Sending %d messages and %d legacy messages" % (nummsg, numlegacy)
+        
         return 0x1f, res
         
     def handle_addBloodMessage(self, params):
-        # msg = Message()
-        # msg.from_params(self, self.bmID)
-        # blockID = make_signed(int(params["blockID"]))
-        # replayNum = int(params["replayNum"])
-    
+        msg = Message()
+        msg.from_params(params, self.bmID)
+        self.bmID += 1
+        
+        self.messages[msg.bmID] = msg
+        self.blocks[msg.blockID].add(msg.bmID)
+        
+        print "Added new message", str(msg)
+        
         return 0x1d, "\x01"
+        
+    def handle_deleteBloodMessage(self, params):
+        bmID = int(params["bmID"])
+        msg = self.messages[bmID]
+        
+        del self.messages[bmID]
+        if bmID in self.blocks[msg.blockID]:
+            self.blocks[msg.blockID].remove(bmID)
+        
+        print "Deleted message", str(msg)
+        
+        return 0x27, "\x01"
         
     def handle_updateBloodMessageGrade(self, params):
         bmID = int(params["bmID"])
@@ -339,18 +382,7 @@ class MessageManager(object):
         
         msg.rating += 1
         
-        if msg.mainMsgID in messageids:
-            if msg.messageID in messageids:
-                extra = messageids[msg.messageID]
-            else:
-                extra = "[%d]" % msg.messageID
-                
-            message = messageids[msg.mainMsgID].replace("***", extra)
-            prettymessage = "%8d %8d %-20s %s %d" % (msg.bmID, msg.blockID, msg.characterID, message, msg.rating)
-            
-        else:
-            prettymessage = "%8d %8d %-20s [%d] [%d] %d" % (msg.bmID, msg.blockID, msg.characterID, msg.messageID, msg.mainMsgID, msg.rating)
-        print "recommended", prettymessage
+        print "Recommended message", str(msg)
         
         return 0x2a, "\x01"
         
@@ -447,9 +479,6 @@ class Server(object):
                         cmd = 0x22
                         data = "000000".decode("hex")
                     
-                        cmd = 0x1f
-                        data = "00000000".decode("hex")
-                        
                     if "addReplayData.spd" in req:
                         cmd = 0x1d
                         data = "01000000".decode("hex")
@@ -462,6 +491,9 @@ class Server(object):
                         
                     if "updateBloodMessageGrade.spd" in req:
                         cmd, data = self.MessageManager.handle_updateBloodMessageGrade(params)
+                        
+                    if "deleteBloodMessage.spd" in req:
+                        cmd, data = self.MessageManager.handle_deleteBloodMessage(params)
                         
                     if "getReplayList.spd" in req:
                         cmd, data = self.handle_getReplayList(cdata)
@@ -506,11 +538,10 @@ class Server(object):
                 sc.close()
                 
             except KeyboardInterrupt:
-                #sc.close()
-                #gserver.close()
+                sc.close()
                 raise
             except:
-                #sc.close()
+                sc.close()
                 traceback.print_exc()
             
             
