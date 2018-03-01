@@ -143,7 +143,6 @@ class SOSManager(object):
     
         data =  struct.pack("<I", len(sos_known)) + "".join(sos_known)
         data += struct.pack("<I", len(sos_new)) + "".join(sos_new)
-        print "sending", repr(data)
         
         return 0x0f, data
 
@@ -452,87 +451,63 @@ class Server(object):
                 
                 if serverport == SERVER_PORT_BOOTSTRAP:
                     data = open("info.ss", "rb").read()
-                    
                     res = self.prepare_response_bootstrap(data)
                 else:
                     params = get_params(cdata)
-                    data = None
+                    clientcmd = req.split()[1].split("/")[-1]
                     
-                    if "login.spd" in req:
+                    if clientcmd == "login.spd":
                         cmd, data = self.handle_login(cdata)
-                        
-                    if "initializeCharacter.spd" in req:
+                    elif clientcmd == "initializeCharacter.spd":
                         cmd, data = self.handle_charinit(cdata)
-                        
-                    if "getQWCData.spd" in req:
+                    elif clientcmd == "getQWCData.spd":
                         cmd, data = self.handle_qwcdata(cdata)
+                    elif clientcmd == "getMultiPlayGrade.spd":
+                        cmd, data = 0x28, "0100000000000000000000000000000000000000000000000000000000".decode("hex")
+                    elif clientcmd == "getBloodMessageGrade.spd":
+                        cmd, data = 0x29, "0100000000".decode("hex")
+                    elif clientcmd == "getTimeMessage.spd":
+                        cmd, data = 0x22, "000000".decode("hex")
+                    elif clientcmd == "addReplayData.spd":
+                        cmd, data = 0x1d, "01000000".decode("hex")
                         
-                    if "getMultiPlayGrade.spd" in req:
-                        cmd = 0x28
-                        data = "0100000000000000000000000000000000000000000000000000000000".decode("hex")
-                    
-                    if "getBloodMessageGrade.spd" in req:
-                        cmd = 0x29
-                        data = "0100000000".decode("hex")
-                        
-                    if "getTimeMessage.spd" in req:
-                        cmd = 0x22
-                        data = "000000".decode("hex")
-                    
-                    if "addReplayData.spd" in req:
-                        cmd = 0x1d
-                        data = "01000000".decode("hex")
-                        
-                    if "getBloodMessage.spd" in req:
+                    elif clientcmd == "getBloodMessage.spd":
                         cmd, data = self.MessageManager.handle_getBloodMessage(params)
-                        
-                    if "addBloodMessage.spd" in req:
+                    elif clientcmd == "addBloodMessage.spd":
                         cmd, data = self.MessageManager.handle_addBloodMessage(params)
-                        
-                    if "updateBloodMessageGrade.spd" in req:
+                    elif clientcmd == "updateBloodMessageGrade.spd":
                         cmd, data = self.MessageManager.handle_updateBloodMessageGrade(params)
-                        
-                    if "deleteBloodMessage.spd" in req:
+                    elif clientcmd == "deleteBloodMessage.spd":
                         cmd, data = self.MessageManager.handle_deleteBloodMessage(params)
                         
-                    if "getReplayList.spd" in req:
+                    elif clientcmd == "getReplayList.spd":
                         cmd, data = self.handle_getReplayList(cdata)
-                    
-                    if "getReplayData.spd" in req:
+                    elif clientcmd == "getReplayData.spd":
                         cmd, data = self.handle_getReplayData(cdata)
-                    
-                    if "getWanderingGhost.spd" in req:
-                        cmd, data = self.GhostManager.handle_getWanderingGhost(params)
                         
-                    if "setWanderingGhost.spd" in req:
+                    elif clientcmd == "getWanderingGhost.spd":
+                        cmd, data = self.GhostManager.handle_getWanderingGhost(params)
+                    elif clientcmd == "setWanderingGhost.spd":
                         cmd, data = self.GhostManager.handle_setWanderingGhost(params)
                         
-                    if "getSosData.spd" in req:
+                    elif clientcmd == "getSosData.spd":
                         cmd, data = self.SOSManager.handle_getSosData(params, serverport)
-                        
-                    if "addSosData.spd" in req:
+                    elif clientcmd == "addSosData.spd":
                         cmd, data = self.SOSManager.handle_addSosData(params, serverport)
-                        
-                    if "checkSosData.spd" in req:
+                    elif clientcmd == "checkSosData.spd":
                         cmd, data = self.SOSManager.handle_checkSosData(params, serverport)
-                        
-                    if "outOfBlock.spd" in req:
+                    elif clientcmd == "outOfBlock.spd":
                         cmd, data = self.SOSManager.handle_outOfBlock(params, serverport)
-                        
-                    if "summonOtherCharacter.spd" in req:
+                    elif clientcmd == "summonOtherCharacter.spd":
                         cmd, data = self.SOSManager.handle_summonOtherCharacter(params, serverport)
-                        
-                    if "initializeMultiPlay.spd" in req:
+                    elif clientcmd == "initializeMultiPlay.spd":
                         cmd, data = 0x15, "\x01"
-                        
-                    if data == None:
+                    else:
                         print repr(req)
                         print repr(cdata)
                         raise Exception("UNKNOWN CLIENT REQUEST")
                         
                     res = self.prepare_response(cmd, data)
-                    # print "sending"
-                    # print res
                     
                 sc.sendall(res)
                 sc.close()
@@ -559,7 +534,8 @@ class Server(object):
     def handle_qwcdata(self, cdata):
         data = ""
         #testparams = (0x5e, 0x81, 0x70, 0x7e, 0x7a, 0x7b, 0x00)
-        testparams = (0xff, -0xff, -0xffff, -0xffffff, -0x7fffffff, 0, 0)
+        #testparams = (0xff, -0xff, -0xffff, -0xffffff, -0x7fffffff, 0, 0)
+        testparams = (0xff, 0xdf, 0xbf, 0x9f, 0x7f, 0, 0)
         
         for i in xrange(7):
             data += struct.pack("<ii", testparams[i], 0)
