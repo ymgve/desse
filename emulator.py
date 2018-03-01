@@ -106,6 +106,8 @@ class SOSData(object):
         self.Xratings = (1, 2, 3, 4, 5) # S, A, B, C, D
         self.Xtotalsessions = 123
         
+        self.updatetime = time.time()
+        
     def serialize(self):
         res = ""
         res += struct.pack("<I", self.sosID)
@@ -154,14 +156,18 @@ class SOSManager(object):
         sos_known = []
         sos_new = []
         
-        for sos in self.activeSOS[serverport].values():
-            if sos.blockID == blockID:
-                if str(sos.sosID) in sosList:
-                    sos_known.append(struct.pack("<I", sos.sosID))
-                    logging.debug("adding known SOS %d" % sos.sosID)
-                else:
-                    sos_new.append(sos.serialize())
-                    logging.debug("adding new SOS %d" % sos.sosID)
+        for sos in list(self.activeSOS[serverport].values()):
+            if sos.updatetime + 30 < time.time():
+                logging.info("Deleted SOS %r due to inactivity" % sos)
+                del self.activeSOS[serverport][sos.characterID]
+            else:
+                if sos.blockID == blockID:
+                    if str(sos.sosID) in sosList:
+                        sos_known.append(struct.pack("<I", sos.sosID))
+                        logging.debug("adding known SOS %d" % sos.sosID)
+                    else:
+                        sos_new.append(sos.serialize())
+                        logging.debug("adding new SOS %d" % sos.sosID)
     
         data =  struct.pack("<I", len(sos_known)) + "".join(sos_known)
         data += struct.pack("<I", len(sos_new)) + "".join(sos_new)
@@ -180,6 +186,9 @@ class SOSManager(object):
     def handle_checkSosData(self, params, serverport):
         characterID = params["characterID"]
         
+        if characterID in self.activeSOS[serverport]:
+            self.activeSOS[serverport][characterID].updatetime = time.time()
+            
         if len(self.playerPending) != 0:
             logging.debug("Potential connect data %r" % self.playerPending)
             
@@ -611,7 +620,13 @@ class Server(object):
         data = ""
         #testparams = (0x5e, 0x81, 0x70, 0x7e, 0x7a, 0x7b, 0x00)
         #testparams = (0xff, -0xff, -0xffff, -0xffffff, -0x7fffffff, 0, 0)
-        testparams = (0x100, 0x100, 0x100, 0x100, 0x100, 0, 0)
+        # 0 = dunno
+        # 1 = dunno
+        # 2 = boletarian palace
+        # 6 = Tower of Latria?
+        
+        testparams = list(int(x) for x in open("tendency.txt", "rb").read().strip().split())
+        logging.info("Tendency test %r" % testparams)
         
         for i in xrange(7):
             data += struct.pack("<ii", testparams[i], 0)
