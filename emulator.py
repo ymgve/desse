@@ -1,4 +1,4 @@
-import socket, traceback, struct, base64, random, cStringIO, zlib, select, time
+import socket, traceback, struct, base64, random, cStringIO, zlib, select, time, logging
 from time import gmtime, strftime
 
 from helpers import *
@@ -18,7 +18,15 @@ for line in open("messageids.txt", "rb"):
     id, text = line.strip().split("|", 1)
     messageids[int(id)] = text
 
-    
+logging.basicConfig(level=logging.DEBUG,
+                    format="[%(asctime)s][%(levelname)s] %(message)s",
+                    filename="emulator.log")
+
+stream_handler = logging.StreamHandler()
+stream_handler.setLevel(logging.INFO)
+
+logging.getLogger("").addHandler(stream_handler)
+
 class ImpSock(object):
     def __init__(self, sc, name):
         self.sc = sc
@@ -34,6 +42,7 @@ class ImpSock(object):
         self.sc.close()
         
     def sendall(self, data):
+        self.logpacket("sent data", data)
         self.sc.sendall(data)
         
     def recv_line(self):
@@ -41,13 +50,12 @@ class ImpSock(object):
         while True:
             c = self.recv(1)
             if len(c) == 0:
-                print "DISCONNECT at line", repr(line)
+                logging.warning("DISCONNECT at line %r" % line)
                 raise Exception("DISCONNECT")
             line += c
             if line.endswith("\r\n"):
                 line = line[:-2]
-                #print self.name, "received", repr(line)
-                # debugwrite(self.name, repr(line))
+                self.logpacket("recv line", line)
                 return line
             
     def recv_all(self, size):
@@ -55,12 +63,11 @@ class ImpSock(object):
         while len(res) < size:
             data = self.recv(size - len(res))
             if len(data) == 0:
-                print "DISCONNECT", repr(res)
+                logging.warning("DISCONNECT %r" % res)
                 raise Exception("DISCONNECT")
             res += data
             
-        #print self.name, "received", repr(res)
-        # debugwrite(self.name, repr(res))
+        self.logpacket("recv data", res)
         return res
             
     def recv_headers(self):
@@ -73,6 +80,9 @@ class ImpSock(object):
             headers[key] = value
             
         return headers
+    
+    def logpacket(self, msg, data):
+        open("packetlog.log", "a").write("[%s][c %r][s %r] %s %r\n" % (time.asctime(time.gmtime()), self.sc.getpeername(), self.sc.getsockname(), msg, data))
     
 class SOSData(object):
     def __init__(self, params, sosID):
@@ -112,6 +122,9 @@ class SOSData(object):
         res += struct.pack("<IIb", self.qwcwb, self.qwclr, self.isBlack)
         
         return res
+        
+    def __repr__(self):
+        return "<SOS %d %d %s %d %d>" % (self.sosID, self.blockID, self.characterID, self.isBlack, self.playerLevel)
 
 class SOSManager(object):
     def __init__(self):
@@ -136,10 +149,10 @@ class SOSManager(object):
             if sos.blockID == blockID:
                 if str(sos.sosID) in sosList:
                     sos_known.append(struct.pack("<I", sos.sosID))
-                    print "adding known SOS", sos.sosID
+                    logging.debug("adding known SOS %d" % sos.sosID)
                 else:
                     sos_new.append(sos.serialize())
-                    print "adding new SOS", sos.sosID
+                    logging.debug("adding new SOS %d" % sos.sosID)
     
         data =  struct.pack("<I", len(sos_known)) + "".join(sos_known)
         data += struct.pack("<I", len(sos_new)) + "".join(sos_new)
@@ -152,19 +165,20 @@ class SOSManager(object):
         
         self.activeSOS[serverport][sos.characterID] = sos
         
-        print "added SOS, current list", self.activeSOS
+        logging.info("added SOS, current list %r" % self.activeSOS)
         return 0x0a, "\x01"
 
     def handle_checkSosData(self, params, serverport):
         characterID = params["characterID"]
         
-        print characterID, self.playerPending
+        if len(self.playerPending) != 0:
+            logging.debug("Potential connect data %r" % self.playerPending)
+            
         if characterID in self.playerPending:
-            print "GOT DATA, SENDING"
+            logging.info("Connecting player %r" % characterID)
             data = self.playerPending[characterID]
             del self.playerPending[characterID]
         else:
-            print "no data"
             data = "\x00"
                     
         return 0x0b, data
@@ -172,11 +186,11 @@ class SOSManager(object):
     def handle_summonOtherCharacter(self, params, serverport):
         ghostID = int(params["ghostID"])
         NPRoomID = params["NPRoomID"]
-        print "ghostID", ghostID, repr(NPRoomID), self.activeSOS
+        logging.info("Attempting to summon %d %r %r" % (ghostID, NPRoomID, self.activeSOS))
         
         for sos in self.activeSOS[serverport].values():
             if sos.sosID == ghostID:
-                print "adding to", repr(sos.characterID)
+                logging.info("Adding pending request for player %r" % sos.characterID)
                 self.playerPending[sos.characterID] = NPRoomID
                 break
         
@@ -185,7 +199,7 @@ class SOSManager(object):
     def handle_outOfBlock(self, params, serverport):
         characterID = params["characterID"]
         if characterID in self.activeSOS[serverport]:
-            print "removing old SOS"
+            logging.debug("removing old SOS %r" % characterID)
             del self.activeSOS[serverport][characterID]
             
         return 0x15, "\x01"
@@ -248,8 +262,8 @@ class GhostManager(object):
             ghost = Ghost(characterID, ghostBlockID, replayData)
             self.ghosts[characterID] = ghost
         except:
-            print "bad data", repr(params)
-            traceback.print_exc()
+            tb = traceback.format_exc()
+            logging.warning("bad ghost data %r\n%s" % (params, tb))
         
         return 0x17, "\x01"
     
@@ -266,7 +280,7 @@ class GhostManager(object):
                 total += 1
                 
         blockslist = sorted((v, k) for (k, v) in blocks.items())
-        print total, blockslist
+        logging.debug("Total players %d %r" % (total, blockslist))
         return total, blockslist
                 
 class Message(object):
@@ -343,7 +357,7 @@ class MessageManager(object):
             
             self.messages[msg.bmID] = msg
                 
-        print "Loaded initial messages"
+        logging.info("Loaded initial messages")
         
         self.bmID = 1000000000
         
@@ -364,7 +378,7 @@ class MessageManager(object):
         
         res = struct.pack("<I", nummsg + numlegacy) + "".join(to_send)
             
-        print "Sending %d messages and %d legacy messages" % (nummsg, numlegacy)
+        logging.debug("Sending %d messages and %d legacy messages" % (nummsg, numlegacy))
         
         return 0x1f, res
         
@@ -376,7 +390,7 @@ class MessageManager(object):
         self.messages[msg.bmID] = msg
         self.blocks[msg.blockID].add(msg.bmID)
         
-        print "Added new message", str(msg)
+        logging.info("Added new message %s" % str(msg))
         
         return 0x1d, "\x01"
         
@@ -388,7 +402,7 @@ class MessageManager(object):
         if bmID in self.blocks[msg.blockID]:
             self.blocks[msg.blockID].remove(bmID)
         
-        print "Deleted message", str(msg)
+        logging.info("Deleted message %s" % str(msg))
         
         return 0x27, "\x01"
         
@@ -398,7 +412,7 @@ class MessageManager(object):
         
         msg.rating += 1
         
-        print "Recommended message", str(msg)
+        logging.info("Recommended message %s" % str(msg))
         
         return 0x2a, "\x01"
         
@@ -423,7 +437,7 @@ class Server(object):
             if (header.messageID, header.mainMsgID, header.addMsgCateID) != (0, 0, 0):
                 self.replayheaders[header.blockID].append(header)
                 
-        print "finished read replay headers"
+        logging.info("Finished reading replay headers")
         
         f = open("replaydata.bin", "rb")
         while True:
@@ -436,7 +450,7 @@ class Server(object):
             
             self.replaydata[ghostID] = data
             
-        print "finished read replay data"
+        logging.info("Finished reading replay data")
                 
     def run(self):
         servers = []
@@ -447,7 +461,7 @@ class Server(object):
             server.listen(5)
             servers.append(server)
         
-        print "listening"
+        logging.info("Server listening")
 
         while True:
             try:
@@ -459,12 +473,13 @@ class Server(object):
                 sc = ImpSock(client_sock, "client")
                 
                 req = sc.recv_line()
-                print "got connect from", client_addr, "to", serverport, "request", repr(req)
+                logging.debug("got connect from %r to %r request %r" % (client_addr, serverport, req))
                 
                 clientheaders = sc.recv_headers()
                         
                 cdata = sc.recv_all(int(clientheaders["Content-Length"]))
                 cdata = decrypt(cdata)
+                sc.logpacket("decr data", cdata)
                 
                 if serverport == SERVER_PORT_BOOTSTRAP:
                     data = open("info.ss", "rb").read()
@@ -474,9 +489,9 @@ class Server(object):
                     clientcmd = req.split()[1].split("/")[-1]
                     
                     if clientcmd == "login.spd":
-                        cmd, data = self.handle_login(cdata)
+                        cmd, data = self.handle_login(params)
                     elif clientcmd == "initializeCharacter.spd":
-                        cmd, data = self.handle_charinit(cdata)
+                        cmd, data = self.handle_initializeCharacter(params)
                     elif clientcmd == "getQWCData.spd":
                         cmd, data = self.handle_qwcdata(cdata)
                     elif clientcmd == "getMultiPlayGrade.spd":
@@ -520,8 +535,9 @@ class Server(object):
                     elif clientcmd == "initializeMultiPlay.spd":
                         cmd, data = 0x15, "\x01"
                     else:
-                        print repr(req)
-                        print repr(cdata)
+                        logging.error("UNKNOWN CLIENT REQUEST")
+                        logging.error("req %r" % req)
+                        logging.error("cdata %r" % cdata)
                         raise Exception("UNKNOWN CLIENT REQUEST")
                         
                     res = self.prepare_response(cmd, data)
@@ -534,10 +550,10 @@ class Server(object):
                 raise
             except:
                 sc.close()
-                traceback.print_exc()
+                tb = traceback.format_exc()
+                logging.error("Exception! Traceback:\n%s" % tb)
             
-            
-    def handle_login(self, cdata):
+    def handle_login(self, params):
         total, blockslist = self.GhostManager.get_current_players()
         motd  = "Welcome to ymgve's test server!\r\n"
         motd += "Current players online: %d\r\n" % total
@@ -547,9 +563,13 @@ class Server(object):
              
         return 0x01, "\x01\x01" + motd + "\x00"
         
-    def handle_charinit(self, cdata):
-        params = get_params(cdata)
-        charname = params["characterID"] + params["index"][0]
+    def handle_initializeCharacter(self, params):
+        characterID = params["characterID"]
+        index = params["index"]
+        
+        logging.info("Character %r logged in" % characterID)
+        
+        charname = characterID + index[0]
         
         data = charname + "\x00"
         return 0x17, data
@@ -569,7 +589,6 @@ class Server(object):
         params = get_params(cdata)
         blockID = make_signed(int(params["blockID"]))
         replayNum = int(params["replayNum"])
-        print blockID, replayNum
         
         data = struct.pack("<I", replayNum)
         for i in xrange(replayNum):
@@ -581,7 +600,6 @@ class Server(object):
     def handle_getReplayData(self, cdata):
         params = get_params(cdata)
         ghostID = int(params["ghostID"])
-        print ghostID
         
         ghostdata = self.replaydata[ghostID]
         data = struct.pack("<II", ghostID, len(ghostdata)) + ghostdata
