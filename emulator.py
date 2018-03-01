@@ -260,6 +260,14 @@ class GhostManager(object):
             #print repr(playername)
             
             ghost = Ghost(characterID, ghostBlockID, replayData)
+            
+            if characterID in self.ghosts:
+                prevGhostBlockID = self.ghosts[characterID].ghostBlockID
+                if ghostBlockID != prevGhostBlockID:
+                    logging.info("Player %r moved from %s to %s" % (characterID, blocknames[prevGhostBlockID], blocknames[ghostBlockID]))
+            else:
+                logging.info("Player %r spawned into %s" % (characterID, blocknames[ghostBlockID]))
+                
             self.ghosts[characterID] = ghost
         except:
             tb = traceback.format_exc()
@@ -556,6 +564,8 @@ class Server(object):
     def handle_login(self, params):
         total, blockslist = self.GhostManager.get_current_players()
         motd  = "Welcome to ymgve's test server!\r\n"
+        motd += "This is a temporary server, it will eventually be shut\r\n"
+        motd += "down and its source code published.\r\n"
         motd += "Current players online: %d\r\n" % total
         motd += "Popular areas:\r\n"
         for count, blockID in blockslist[0:5]:
