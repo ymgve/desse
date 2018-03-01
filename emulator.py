@@ -1,4 +1,4 @@
-import socket, traceback, struct, base64, random, cStringIO, zlib, select
+import socket, traceback, struct, base64, random, cStringIO, zlib, select, time
 from time import gmtime, strftime
 
 from helpers import *
@@ -195,6 +195,7 @@ class Ghost(object):
         self.characterID = characterID
         self.ghostBlockID = ghostBlockID
         self.replayData = replayData
+        self.timestamp = time.time()
         
 class GhostManager(object):
     def __init__(self):
@@ -252,6 +253,22 @@ class GhostManager(object):
         
         return 0x17, "\x01"
     
+    def get_current_players(self):
+        blocks = {}
+        current_time = time.time()
+        total = 0
+        
+        for ghost in self.ghosts.values():
+            if ghost.timestamp + 30.0 >= current_time:
+                if ghost.ghostBlockID not in blocks:
+                    blocks[ghost.ghostBlockID] = 0
+                blocks[ghost.ghostBlockID] += 1
+                total += 1
+                
+        blockslist = sorted((v, k) for (k, v) in blocks.items())
+        print total, blockslist
+        return total, blockslist
+                
 class Message(object):
     def __init__(self):
         pass
@@ -521,8 +538,14 @@ class Server(object):
             
             
     def handle_login(self, cdata):
-        motd = "\x01\x01Welcome to ymgve's test server!\r\nMultiplayer might be working now!"
-        return 0x01, motd + "\x00"
+        total, blockslist = self.GhostManager.get_current_players()
+        motd  = "Welcome to ymgve's test server!\r\n"
+        motd += "Current players online: %d\r\n" % total
+        motd += "Popular areas:\r\n"
+        for count, blockID in blockslist[0:5]:
+             motd += " %4d %s" % (count, blocknames[blockID])
+             
+        return 0x01, "\x01\x01" + motd + "\x00"
         
     def handle_charinit(self, cdata):
         params = get_params(cdata)
@@ -535,7 +558,7 @@ class Server(object):
         data = ""
         #testparams = (0x5e, 0x81, 0x70, 0x7e, 0x7a, 0x7b, 0x00)
         #testparams = (0xff, -0xff, -0xffff, -0xffffff, -0x7fffffff, 0, 0)
-        testparams = (0xff, 0xdf, 0xbf, 0x9f, 0x7f, 0, 0)
+        testparams = (0x00, 0x100, 0x200, 0x300, 0x400, 0, 0)
         
         for i in xrange(7):
             data += struct.pack("<ii", testparams[i], 0)
