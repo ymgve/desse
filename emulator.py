@@ -145,6 +145,11 @@ class SOSManager(object):
         self.activeSOS[SERVER_PORT_EU] = {}
         self.activeSOS[SERVER_PORT_JP] = {}
         
+        self.monkPending = {}
+        self.monkPending[SERVER_PORT_US] = {}
+        self.monkPending[SERVER_PORT_EU] = {}
+        self.monkPending[SERVER_PORT_JP] = {}
+        
         self.playerPending = {}
 
     def handle_getSosData(self, params, serverport):
@@ -189,13 +194,19 @@ class SOSManager(object):
         if characterID in self.activeSOS[serverport]:
             self.activeSOS[serverport][characterID].updatetime = time.time()
             
-        if len(self.playerPending) != 0:
-            logging.debug("Potential connect data %r" % self.playerPending)
+        if len(self.playerPending) != 0 or len(self.monkPending[serverport]) != 0:
+            logging.debug("Potential connect data %r %r" % (self.playerPending, self.monkPending))
             
-        if characterID in self.playerPending:
+        if characterID in self.monkPending[serverport]:
+            logging.info("Summoning for monk player %r" % characterID)
+            data = self.monkPending[serverport][characterID]
+            del self.monkPending[serverport][characterID]
+            
+        elif characterID in self.playerPending:
             logging.info("Connecting player %r" % characterID)
             data = self.playerPending[characterID]
             del self.playerPending[characterID]
+            
         else:
             data = "\x00"
                     
@@ -204,7 +215,7 @@ class SOSManager(object):
     def handle_summonOtherCharacter(self, params, serverport, playerid):
         ghostID = int(params["ghostID"])
         NPRoomID = params["NPRoomID"]
-        logging.info("%s is attempting to summon %d %r %r" % (playerid, ghostID, NPRoomID, self.activeSOS))
+        logging.info("%s is attempting to summon %d %r" % (playerid, ghostID, self.activeSOS))
         
         for sos in self.activeSOS[serverport].values():
             if sos.sosID == ghostID:
@@ -214,6 +225,22 @@ class SOSManager(object):
         
         return 0x0a, "\x01"
             
+    def handle_summonBlackGhost(self, params, serverport, playerid):
+        NPRoomID = params["NPRoomID"]
+        logging.info("%s is attempting to summon for monk %r" % (playerid, self.activeSOS))
+        
+        cand = None
+        for sos in self.activeSOS[serverport]: 
+            if sos.blockID in (40070, 40071, 40072, 40073, 40074, 40170, 40171, 40172, 40270):
+                cand = sos
+                break
+                
+        if cand is not None:
+            self.monkPending[serverport][cand.characterID] = NPRoomID
+            return 0x23, "\x01"
+        else:
+            return 0x23, "\x00"
+    
     def handle_outOfBlock(self, params, serverport):
         characterID = params["characterID"]
         if characterID in self.activeSOS[serverport]:
@@ -240,7 +267,7 @@ class GhostManager(object):
         
         cands = []
         for ghost in self.ghosts.values():
-            if ghost.ghostBlockID == blockID:
+            if ghost.ghostBlockID == blockID and ghost.characterID != characterID:
                 cands.append(ghost)
                 
         maxGhostNum = min(maxGhostNum, len(cands))
@@ -566,6 +593,8 @@ class Server(object):
                         cmd, data = self.SOSManager.handle_outOfBlock(params, serverport)
                     elif clientcmd == "summonOtherCharacter.spd":
                         cmd, data = self.SOSManager.handle_summonOtherCharacter(params, serverport, playerid)
+                    elif clientcmd == "summonBlackGhost.spd":
+                        cmd, data = self.SOSManager.handle_summonBlackGhost(params, serverport, playerid)
                     elif clientcmd == "initializeMultiPlay.spd":
                         cmd, data = 0x15, "\x01"
                     elif clientcmd == "finalizeMultiPlay.spd":
