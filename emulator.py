@@ -124,7 +124,16 @@ class SOSData(object):
         return res
         
     def __repr__(self):
-        return "<SOS %d %d %s %d %d>" % (self.sosID, self.blockID, self.characterID, self.isBlack, self.playerLevel)
+        if self.isBlack == 1:
+            summontype = "Red"
+        elif self.isBlack == 2:
+            summontype = "Blue"
+        elif self.isBlack == 3:
+            summontype = "Invasion"
+        else:
+            summontype = "Unknown (%d)" % self.isBlack
+            
+        return "<SOS id %d %s %r %s lv%d>" % (self.sosID, blocknames[self.blockID], self.characterID, summontype, self.playerLevel)
 
 class SOSManager(object):
     def __init__(self):
@@ -183,10 +192,10 @@ class SOSManager(object):
                     
         return 0x0b, data
         
-    def handle_summonOtherCharacter(self, params, serverport):
+    def handle_summonOtherCharacter(self, params, serverport, playerid):
         ghostID = int(params["ghostID"])
         NPRoomID = params["NPRoomID"]
-        logging.info("Attempting to summon %d %r %r" % (ghostID, NPRoomID, self.activeSOS))
+        logging.info("%s is attempting to summon %d %r %r" % (playerid, ghostID, NPRoomID, self.activeSOS))
         
         for sos in self.activeSOS[serverport].values():
             if sos.sosID == ghostID:
@@ -334,10 +343,10 @@ class Message(object):
                 extra = "[%d]" % self.messageID
                 
             message = messageids[self.mainMsgID].replace("***", extra)
-            prettymessage = "%8d %8d %-20s %s %d" % (self.bmID, self.blockID, self.characterID, message, self.rating)
+            prettymessage = "%8d %8s %-20r %s %d" % (self.bmID, blocknames[self.blockID], self.characterID, message, self.rating)
             
         else:
-            prettymessage = "%8d %8d %-20s [%d] [%d] %d" % (self.bmID, self.blockID, self.characterID, self.messageID, self.mainMsgID, self.rating)
+            prettymessage = "%8d %8s %-20r [%d] [%d] %d" % (self.bmID, blocknames[self.blockID], self.characterID, self.messageID, self.mainMsgID, self.rating)
 
         return prettymessage
         
@@ -431,6 +440,7 @@ class Server(object):
         self.MessageManager = MessageManager()
         self.replayheaders = {}
         self.replaydata = {}
+        self.players = {}
         
         f = open("replayheaders.bin", "rb")
         while True:
@@ -478,6 +488,7 @@ class Server(object):
                 serverport = ready_server.getsockname()[1]
                 
                 client_sock, client_addr = ready_server.accept()
+                clientip = client_addr[0]
                 sc = ImpSock(client_sock, "client")
                 
                 req = sc.recv_line()
@@ -489,6 +500,10 @@ class Server(object):
                 cdata = decrypt(cdata)
                 sc.logpacket("decr data", cdata)
                 
+                if clientip not in self.players:
+                    self.players[clientip] = "unknown " + clientip
+                playerid = self.players[clientip]
+                
                 if serverport == SERVER_PORT_BOOTSTRAP:
                     data = open("info.ss", "rb").read()
                     res = self.prepare_response_bootstrap(data)
@@ -497,11 +512,13 @@ class Server(object):
                     clientcmd = req.split()[1].split("/")[-1]
                     
                     if clientcmd == "login.spd":
-                        cmd, data = self.handle_login(params)
+                        cmd, data = self.handle_login(params, clientip)
                     elif clientcmd == "initializeCharacter.spd":
                         cmd, data = self.handle_initializeCharacter(params)
                     elif clientcmd == "getQWCData.spd":
                         cmd, data = self.handle_qwcdata(cdata)
+                    elif clientcmd == "addQWCData.spd":
+                        cmd, data = 0x09, "\x01"
                     elif clientcmd == "getMultiPlayGrade.spd":
                         cmd, data = 0x28, "0100000000000000000000000000000000000000000000000000000000".decode("hex")
                     elif clientcmd == "getBloodMessageGrade.spd":
@@ -539,9 +556,11 @@ class Server(object):
                     elif clientcmd == "outOfBlock.spd":
                         cmd, data = self.SOSManager.handle_outOfBlock(params, serverport)
                     elif clientcmd == "summonOtherCharacter.spd":
-                        cmd, data = self.SOSManager.handle_summonOtherCharacter(params, serverport)
+                        cmd, data = self.SOSManager.handle_summonOtherCharacter(params, serverport, playerid)
                     elif clientcmd == "initializeMultiPlay.spd":
                         cmd, data = 0x15, "\x01"
+                    elif clientcmd == "finalizeMultiPlay.spd":
+                        cmd, data = 0x21, "\x01"
                     else:
                         logging.error("UNKNOWN CLIENT REQUEST")
                         logging.error("req %r" % req)
@@ -561,15 +580,19 @@ class Server(object):
                 tb = traceback.format_exc()
                 logging.error("Exception! Traceback:\n%s" % tb)
             
-    def handle_login(self, params):
+    def handle_login(self, params, clientip):
+        NPID = params["NPID"]
+        rang = params["rang"]
+        self.players[clientip] = "%r %r" % (NPID, rang)
+        
         total, blockslist = self.GhostManager.get_current_players()
         motd  = "Welcome to ymgve's test server!\r\n"
         motd += "This is a temporary server, it will eventually be shut\r\n"
         motd += "down and its source code published.\r\n"
         motd += "Current players online: %d\r\n" % total
         motd += "Popular areas:\r\n"
-        for count, blockID in blockslist[0:5]:
-             motd += " %4d %s" % (count, blocknames[blockID])
+        for count, blockID in blockslist[::-1][0:5]:
+             motd += "%4d %s\r\n" % (count, blocknames[blockID])
              
         return 0x01, "\x01\x01" + motd + "\x00"
         
@@ -588,7 +611,7 @@ class Server(object):
         data = ""
         #testparams = (0x5e, 0x81, 0x70, 0x7e, 0x7a, 0x7b, 0x00)
         #testparams = (0xff, -0xff, -0xffff, -0xffffff, -0x7fffffff, 0, 0)
-        testparams = (0x00, 0x100, 0x200, 0x300, 0x400, 0, 0)
+        testparams = (0x100, 0x100, 0x100, 0x100, 0x100, 0, 0)
         
         for i in xrange(7):
             data += struct.pack("<ii", testparams[i], 0)
