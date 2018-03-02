@@ -76,7 +76,7 @@ class PlayerManager(object):
         gradetext = "??no grade??"
         for key in ("gradeS", "gradeA", "gradeB", "gradeC", "gradeD"):
             if params[key] == "1":
-                self.conn.execute("update players set %s = %s + 1 where characterID = ?" % key, (characterID,))
+                self.conn.execute("update players set %s = %s + 1 where characterID = ?" % (key, key), (characterID,))
                 self.conn.commit()
                 gradetext = key
                 break
@@ -89,7 +89,7 @@ class PlayerManager(object):
         characterID = params["characterID"]
         
         key = ("gradeS", "gradeA", "gradeB", "gradeC", "gradeD")[int(params["grade"])]
-        self.conn.execute("update players set %s = %s + 1 where characterID = ?" % key, (characterID,))
+        self.conn.execute("update players set %s = %s + 1 where characterID = ?" % (key, key), (characterID,))
         self.conn.commit()
         logging.info("Player %r gave player %r a %s rating" % (myCharacterID, characterID, gradetext))
         
