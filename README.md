@@ -22,6 +22,7 @@ Setup:
 
  - set up some kind of DNS proxy (I used https://github.com/Crypt0s/FakeDns - edit the remote.conf file and insert your server's IP)
  - edit info.ss and insert your server's IP
+ - create "db" subdirectory in your server directory
  - run server with `python emulator.py`
  
 Everyone that wants to connect to the server needs to configure the DNS to point to your DNS proxy in their PS3 network settings.
