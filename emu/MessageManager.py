@@ -148,14 +148,19 @@ class MessageManager(object):
         msg = Message()
         msg.from_params(params, None)
         
-        c = self.conn.cursor()
-        c.execute("insert into messages(characterID, blockID, posx, posy, posz, angx, angy, angz, messageID, mainMsgID, addMsgCateId, rating, legacy) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", msg.to_db_row()[1:])
-        msg.bmID = c.lastrowid
-        self.conn.commit()
-        
-        logging.info("Added new message %s" % str(msg))
-        
-        return 0x1d, "\x01"
+        if msg.mainMsgID == 13002:
+            custom_command = (msg.messageID - 40700) * 10
+            logging.info("Player %s triggered custom command %d" % (msg.characterID, custom_command))
+        else:
+            c = self.conn.cursor()
+            c.execute("insert into messages(characterID, blockID, posx, posy, posz, angx, angy, angz, messageID, mainMsgID, addMsgCateId, rating, legacy) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", msg.to_db_row()[1:])
+            msg.bmID = c.lastrowid
+            self.conn.commit()
+            
+            custom_command = None
+            logging.info("Added new message %s" % str(msg))
+            
+        return 0x1d, "\x01", custom_command
         
     def handle_deleteBloodMessage(self, params):
         bmID = int(params["bmID"])

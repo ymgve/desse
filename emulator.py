@@ -371,7 +371,8 @@ class Server(object):
                     elif clientcmd == "getBloodMessage.spd":
                         cmd, data = self.MessageManager.handle_getBloodMessage(params)
                     elif clientcmd == "addBloodMessage.spd":
-                        cmd, data = self.MessageManager.handle_addBloodMessage(params)
+                        cmd, data, custom_command = self.MessageManager.handle_addBloodMessage(params)
+                        
                     elif clientcmd == "updateBloodMessageGrade.spd":
                         cmd, data = self.MessageManager.handle_updateBloodMessageGrade(params)
                     elif clientcmd == "deleteBloodMessage.spd":
