@@ -1,22 +1,13 @@
 import socket, traceback, struct, base64, random, cStringIO, zlib, select, time, logging
 from time import gmtime, strftime
 
-from helpers import *
+from emu.Util import *
+from emu.GhostManager import *
 
 SERVER_PORT_BOOTSTRAP = 18000
 SERVER_PORT_US = 18666
 SERVER_PORT_EU = 18667
 SERVER_PORT_JP = 18668
-
-blocknames = {}
-for line in open("blocknames.txt", "rb"):
-    blockID, blockname = line.strip().split("|")
-    blocknames[int(blockID)] = blockname
-
-messageids = {}
-for line in open("messageids.txt", "rb"):
-    id, text = line.strip().split("|", 1)
-    messageids[int(id)] = text
 
 logging.basicConfig(level=logging.DEBUG,
                     format="[%(asctime)s][%(levelname)s] %(message)s",
@@ -26,6 +17,30 @@ stream_handler = logging.StreamHandler()
 stream_handler.setLevel(logging.INFO)
 
 logging.getLogger("").addHandler(stream_handler)
+
+class ReplayHeader(object):
+    def __init__(self):
+        pass
+        
+    def create(self, sio):
+        ghostID = sio.read(4)
+        if len(ghostID) != 4:
+            return False
+            
+        self.ghostID = struct.unpack("<I", ghostID)[0]
+        
+        self.name = readcstring(sio)
+        self.data = sio.read(40)
+        
+        self.blockID, self.posx, self.posy, self.posz, self.angx, self.angy, self.angz, self.messageID, self.mainMsgID, self.addMsgCateID = struct.unpack("<iffffffIII", self.data)
+        
+        return True
+        
+    def to_bin(self):
+        res = struct.pack("<I", self.ghostID)
+        res += self.name + "\x00"
+        res += self.data
+        return res
 
 class ImpSock(object):
     def __init__(self, sc, name):
@@ -249,93 +264,6 @@ class SOSManager(object):
             
         return 0x15, "\x01"
 
-class Ghost(object):
-    def __init__(self, characterID, ghostBlockID, replayData):
-        self.characterID = characterID
-        self.ghostBlockID = ghostBlockID
-        self.replayData = replayData
-        self.timestamp = time.time()
-        
-class GhostManager(object):
-    def __init__(self):
-        self.ghosts = {}
-        
-    def handle_getWanderingGhost(self, params):
-        characterID = params["characterID"]
-        blockID = make_signed(int(params["blockID"]))
-        maxGhostNum = int(params["maxGhostNum"])
-        
-        cands = []
-        for ghost in self.ghosts.values():
-            if ghost.ghostBlockID == blockID and ghost.characterID != characterID:
-                cands.append(ghost)
-                
-        maxGhostNum = min(maxGhostNum, len(cands))
-        
-        res = struct.pack("<II", 0, maxGhostNum)
-        for ghost in random.sample(cands, maxGhostNum):
-            replay = base64.b64encode(ghost.replayData).replace("+", " ")
-            res += struct.pack("<I", len(replay))
-            res += replay
-
-        return 0x11, res
-        
-    def handle_setWanderingGhost(self, params):
-        characterID = params["characterID"]
-        ghostBlockID = make_signed(int(params["ghostBlockID"]))
-        posx = float(params["posx"])
-        posy = float(params["posy"])
-        posz = float(params["posz"])
-        replayData = decode_broken_base64(params["replayData"])
-        
-        try:
-            z = zlib.decompressobj()
-            data = z.decompress(replayData)
-            assert z.unconsumed_tail == ""
-            
-            sio = cStringIO.StringIO(data)
-            poscount, num1, num2 = struct.unpack(">III", sio.read(12))
-            #print "%08x %08x %08x" % (poscount, num1, num2)
-            for i in xrange(poscount):
-                posx, posy, posz, angx, angy, angz, num3, num4 = struct.unpack(">ffffffII", sio.read(32))
-                #print "%7.2f %7.2f %7.2f %7.2f %7.2f %7.2f %08x %08x" % (posx, posy, posz, angx, angy, angz, num3, num4)
-            unknowns = struct.unpack(">iiiiiiiiiiiiiiiiiiii", sio.read(4 * 20))
-            #print unknowns
-            playername = sio.read(24).decode("utf-16be").rstrip("\x00")
-            #print repr(playername)
-            
-            ghost = Ghost(characterID, ghostBlockID, replayData)
-            
-            if characterID in self.ghosts:
-                prevGhostBlockID = self.ghosts[characterID].ghostBlockID
-                if ghostBlockID != prevGhostBlockID:
-                    logging.info("Player %r moved from %s to %s" % (characterID, blocknames[prevGhostBlockID], blocknames[ghostBlockID]))
-            else:
-                logging.info("Player %r spawned into %s" % (characterID, blocknames[ghostBlockID]))
-                
-            self.ghosts[characterID] = ghost
-        except:
-            tb = traceback.format_exc()
-            logging.warning("bad ghost data %r\n%s" % (params, tb))
-        
-        return 0x17, "\x01"
-    
-    def get_current_players(self):
-        blocks = {}
-        current_time = time.time()
-        total = 0
-        
-        for ghost in self.ghosts.values():
-            if ghost.timestamp + 30.0 >= current_time:
-                if ghost.ghostBlockID not in blocks:
-                    blocks[ghost.ghostBlockID] = 0
-                blocks[ghost.ghostBlockID] += 1
-                total += 1
-                
-        blockslist = sorted((v, k) for (k, v) in blocks.items())
-        logging.debug("Total players %d %r" % (total, blockslist))
-        return total, blockslist
-                
 class Message(object):
     def __init__(self):
         pass
