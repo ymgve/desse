@@ -29,7 +29,7 @@ class PlayerManager(object):
     def ensure_user_created(self, characterID):
         row = self.conn.execute("select count(*) from players where characterID = ?", (characterID,)).fetchone()
         if row[0] == 0:
-            self.conn.execute("insert into players(characterID, gradeS, gradeA, gradeB, gradeC, gradeD, numsessions, messagerating, desired_tendency) VALUES (?,?,?,?,?,?,?,?,?)", (characterID, 5, 4, 3, 2, 1, 123, 0, 0))
+            self.conn.execute("insert into players(characterID, gradeS, gradeA, gradeB, gradeC, gradeD, numsessions, messagerating, desired_tendency) VALUES (?,?,?,?,?,?,?,?,?)", (characterID, 0, 0, 0, 0, 0, 0, 0, 0))
             self.conn.commit()
             logging.info("Created new player %r in database" % characterID)
     
@@ -70,21 +70,18 @@ class PlayerManager(object):
         return 0x29, data
     
     def handle_finalizeMultiPlay(self, params):
-        # TODO - the characterID is of your own player, need some way to direct the grading to the right user
-        # there's a "presence" parameter that seems to match between players, might use that
-        
         characterID = params["characterID"]
         self.ensure_user_created(characterID)
         
         gradetext = "??no grade??"
         for key in ("gradeS", "gradeA", "gradeB", "gradeC", "gradeD"):
             if params[key] == "1":
-                # self.conn.execute("update players set %s = %s + 1 where characterID = ?" % key, (characterID,))
-                # self.conn.commit()
-                gradetext == key
+                self.conn.execute("update players set %s = %s + 1 where characterID = ?" % key, (characterID,))
+                self.conn.commit()
+                gradetext = key
                 break
 
-        logging.info("Player %r finished a multiplayer session successfully and gave %s" % (characterID, gradetext))
+        logging.info("Player %r finished a multiplayer session successfully and received %s" % (characterID, gradetext))
         
         return 0x21, "\x01"
         

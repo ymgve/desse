@@ -55,9 +55,9 @@ class GhostManager(object):
             if characterID in self.ghosts:
                 prevGhostBlockID = self.ghosts[characterID].ghostBlockID
                 if ghostBlockID != prevGhostBlockID:
-                    logging.info("Player %r moved from %s to %s" % (characterID, blocknames[prevGhostBlockID], blocknames[ghostBlockID]))
+                    logging.debug("Player %r moved from %s to %s" % (characterID, blocknames[prevGhostBlockID], blocknames[ghostBlockID]))
             else:
-                logging.info("Player %r spawned into %s" % (characterID, blocknames[ghostBlockID]))
+                logging.debug("Player %r spawned into %s" % (characterID, blocknames[ghostBlockID]))
                 
             self.ghosts[characterID] = ghost
         
