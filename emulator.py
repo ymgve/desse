@@ -2,13 +2,11 @@ import socket, traceback, struct, base64, random, cStringIO, zlib, select, time,
 from time import gmtime, strftime
 
 from emu.Util import *
+
 from emu.GhostManager import *
 from emu.MessageManager import *
-
-SERVER_PORT_BOOTSTRAP = 18000
-SERVER_PORT_US = 18666
-SERVER_PORT_EU = 18667
-SERVER_PORT_JP = 18668
+from emu.PlayerManager import *
+from emu.SOSManager import *
 
 logging.basicConfig(level=logging.DEBUG,
                     format="[%(asctime)s][%(levelname)s] %(message)s",
@@ -99,177 +97,13 @@ class ImpSock(object):
     
     def logpacket(self, msg, data):
         open("packetlog.log", "a").write("[%s][c %r][s %r] %s %r\n" % (time.asctime(time.gmtime()), self.sc.getpeername(), self.sc.getsockname(), msg, data))
-    
-class SOSData(object):
-    def __init__(self, params, sosID):
-        self.sosID = sosID
-        self.blockID = make_signed(int(params["blockID"]))
-        self.characterID = params["characterID"]
-        self.posx = float(params["posx"])
-        self.posy = float(params["posy"])
-        self.posz = float(params["posz"])
-        self.angx = float(params["angx"])
-        self.angy = float(params["angy"])
-        self.angz = float(params["angz"])
-        self.messageID = int(params["messageID"])
-        self.mainMsgID = int(params["mainMsgID"])
-        self.addMsgCateID = int(params["addMsgCateID"])
-        self.playerInfo = params["playerInfo"]
-        self.qwcwb = int(params["qwcwb"])
-        self.qwclr = int(params["qwclr"])
-        self.isBlack = int(params["isBlack"])
-        self.playerLevel = int(params["playerLevel"])
-        self.Xratings = (1, 2, 3, 4, 5) # S, A, B, C, D
-        self.Xtotalsessions = 123
-        
-        self.updatetime = time.time()
-        
-    def serialize(self):
-        res = ""
-        res += struct.pack("<I", self.sosID)
-        res += self.characterID + "\x00"
-        res += struct.pack("<fff", self.posx, self.posy, self.posz)
-        res += struct.pack("<fff", self.angx, self.angy, self.angz)
-        res += struct.pack("<III", self.messageID, self.mainMsgID, self.addMsgCateID)
-        res += struct.pack("<I", 0) # unknown1
-        for r in self.Xratings:
-            res += struct.pack("<I", r)
-        res += struct.pack("<I", 0) # unknown2
-        res += struct.pack("<I", self.Xtotalsessions)
-        res += self.playerInfo + "\x00"
-        res += struct.pack("<IIb", self.qwcwb, self.qwclr, self.isBlack)
-        
-        return res
-        
-    def __repr__(self):
-        if self.isBlack == 1:
-            summontype = "Red"
-        elif self.isBlack == 2:
-            summontype = "Blue"
-        elif self.isBlack == 3:
-            summontype = "Invasion"
-        else:
-            summontype = "Unknown (%d)" % self.isBlack
-            
-        return "<SOS id %d %s %r %s lv%d>" % (self.sosID, blocknames[self.blockID], self.characterID, summontype, self.playerLevel)
-
-class SOSManager(object):
-    def __init__(self):
-        self.SOSindex = 1
-        self.activeSOS = {}
-        self.activeSOS[SERVER_PORT_US] = {}
-        self.activeSOS[SERVER_PORT_EU] = {}
-        self.activeSOS[SERVER_PORT_JP] = {}
-        
-        self.monkPending = {}
-        self.monkPending[SERVER_PORT_US] = {}
-        self.monkPending[SERVER_PORT_EU] = {}
-        self.monkPending[SERVER_PORT_JP] = {}
-        
-        self.playerPending = {}
-
-    def handle_getSosData(self, params, serverport):
-        # TODO: limit number of SOS to what the client requests
-        
-        blockID = make_signed(int(params["blockID"]))
-        sosNum = int(params["sosNum"])
-        sosList = params["sosList"].split("a0a")
-        sos_known = []
-        sos_new = []
-        
-        for sos in list(self.activeSOS[serverport].values()):
-            if sos.updatetime + 30 < time.time():
-                logging.info("Deleted SOS %r due to inactivity" % sos)
-                del self.activeSOS[serverport][sos.characterID]
-            else:
-                if sos.blockID == blockID:
-                    if str(sos.sosID) in sosList:
-                        sos_known.append(struct.pack("<I", sos.sosID))
-                        logging.debug("adding known SOS %d" % sos.sosID)
-                    else:
-                        sos_new.append(sos.serialize())
-                        logging.debug("adding new SOS %d" % sos.sosID)
-    
-        data =  struct.pack("<I", len(sos_known)) + "".join(sos_known)
-        data += struct.pack("<I", len(sos_new)) + "".join(sos_new)
-        
-        return 0x0f, data
-
-    def handle_addSosData(self, params, serverport):
-        sos = SOSData(params, self.SOSindex)
-        self.SOSindex += 1
-        
-        self.activeSOS[serverport][sos.characterID] = sos
-        
-        logging.info("added SOS, current list %r" % self.activeSOS)
-        return 0x0a, "\x01"
-
-    def handle_checkSosData(self, params, serverport):
-        characterID = params["characterID"]
-        
-        if characterID in self.activeSOS[serverport]:
-            self.activeSOS[serverport][characterID].updatetime = time.time()
-            
-        if len(self.playerPending) != 0 or len(self.monkPending[serverport]) != 0:
-            logging.debug("Potential connect data %r %r" % (self.playerPending, self.monkPending))
-            
-        if characterID in self.monkPending[serverport]:
-            logging.info("Summoning for monk player %r" % characterID)
-            data = self.monkPending[serverport][characterID]
-            del self.monkPending[serverport][characterID]
-            
-        elif characterID in self.playerPending:
-            logging.info("Connecting player %r" % characterID)
-            data = self.playerPending[characterID]
-            del self.playerPending[characterID]
-            
-        else:
-            data = "\x00"
-                    
-        return 0x0b, data
-        
-    def handle_summonOtherCharacter(self, params, serverport, playerid):
-        ghostID = int(params["ghostID"])
-        NPRoomID = params["NPRoomID"]
-        logging.info("%s is attempting to summon %d %r" % (playerid, ghostID, self.activeSOS))
-        
-        for sos in self.activeSOS[serverport].values():
-            if sos.sosID == ghostID:
-                logging.info("Adding pending request for player %r" % sos.characterID)
-                self.playerPending[sos.characterID] = NPRoomID
-                break
-        
-        return 0x0a, "\x01"
-            
-    def handle_summonBlackGhost(self, params, serverport, playerid):
-        NPRoomID = params["NPRoomID"]
-        logging.info("%s is attempting to summon for monk %r" % (playerid, self.activeSOS))
-        
-        cand = None
-        for sos in self.activeSOS[serverport]: 
-            if sos.blockID in (40070, 40071, 40072, 40073, 40074, 40170, 40171, 40172, 40270):
-                cand = sos
-                break
-                
-        if cand is not None:
-            self.monkPending[serverport][cand.characterID] = NPRoomID
-            return 0x23, "\x01"
-        else:
-            return 0x23, "\x00"
-    
-    def handle_outOfBlock(self, params, serverport):
-        characterID = params["characterID"]
-        if characterID in self.activeSOS[serverport]:
-            logging.debug("removing old SOS %r" % characterID)
-            del self.activeSOS[serverport][characterID]
-            
-        return 0x15, "\x01"
 
 class Server(object):
     def __init__(self):
         self.GhostManager = GhostManager()
-        self.SOSManager = SOSManager()
         self.MessageManager = MessageManager()
+        self.SOSManager = SOSManager()
+        self.PlayerManager = PlayerManager()
         self.replayheaders = {}
         self.replaydata = {}
         self.players = {}
@@ -347,20 +181,21 @@ class Server(object):
                     if client_ip not in self.players:
                         self.players[client_ip] = "[%s]" % client_ip
                         
-                    playerid = self.players[client_ip]
+                    characterID = self.players[client_ip]
                     
                     if clientcmd == "login.spd":
                         cmd, data = self.handle_login(params)
                     elif clientcmd == "initializeCharacter.spd":
-                        cmd, data = self.handle_initializeCharacter(params)
+                        cmd, data, characterID = self.PlayerManager.handle_initializeCharacter(params)
+                        self.players[client_ip] = characterID
                     elif clientcmd == "getQWCData.spd":
-                        cmd, data = self.handle_qwcdata(cdata)
+                        cmd, data = self.PlayerManager.handle_getQWCData(params, characterID)
                     elif clientcmd == "addQWCData.spd":
                         cmd, data = 0x09, "\x01"
                     elif clientcmd == "getMultiPlayGrade.spd":
-                        cmd, data = 0x28, "0100000000000000000000000000000000000000000000000000000000".decode("hex")
+                        cmd, data = self.PlayerManager.handle_getMultiPlayGrade(params)
                     elif clientcmd == "getBloodMessageGrade.spd":
-                        cmd, data = 0x29, "0100000000".decode("hex")
+                        cmd, data = self.PlayerManager.handle_getBloodMessageGrade(params)
                     elif clientcmd == "getTimeMessage.spd":
                         cmd, data = self.handle_getTimeMessage(params)
                     elif clientcmd == "getAgreement.spd": # not observed in the wild, mostly guessing
@@ -374,7 +209,7 @@ class Server(object):
                         cmd, data, custom_command = self.MessageManager.handle_addBloodMessage(params)
                         
                     elif clientcmd == "updateBloodMessageGrade.spd":
-                        cmd, data = self.MessageManager.handle_updateBloodMessageGrade(params)
+                        cmd, data = self.MessageManager.handle_updateBloodMessageGrade(params, self)
                     elif clientcmd == "deleteBloodMessage.spd":
                         cmd, data = self.MessageManager.handle_deleteBloodMessage(params)
                         
@@ -393,19 +228,22 @@ class Server(object):
                     elif clientcmd == "getSosData.spd":
                         cmd, data = self.SOSManager.handle_getSosData(params, serverport)
                     elif clientcmd == "addSosData.spd":
-                        cmd, data = self.SOSManager.handle_addSosData(params, serverport)
+                        cmd, data = self.SOSManager.handle_addSosData(params, serverport, self)
                     elif clientcmd == "checkSosData.spd":
                         cmd, data = self.SOSManager.handle_checkSosData(params, serverport)
                     elif clientcmd == "outOfBlock.spd":
                         cmd, data = self.SOSManager.handle_outOfBlock(params, serverport)
                     elif clientcmd == "summonOtherCharacter.spd":
-                        cmd, data = self.SOSManager.handle_summonOtherCharacter(params, serverport, playerid)
+                        cmd, data = self.SOSManager.handle_summonOtherCharacter(params, serverport, characterID)
                     elif clientcmd == "summonBlackGhost.spd":
-                        cmd, data = self.SOSManager.handle_summonBlackGhost(params, serverport, playerid)
+                        cmd, data = self.SOSManager.handle_summonBlackGhost(params, serverport, characterID)
                     elif clientcmd == "initializeMultiPlay.spd":
+                        logging.info("Player %r started a multiplayer session successfully" % characterID)
                         cmd, data = 0x15, "\x01"
                     elif clientcmd == "finalizeMultiPlay.spd":
-                        cmd, data = 0x21, "\x01"
+                        cmd, data = self.PlayerManager.handle_finalizeMultiPlay(params)
+                    elif clientcmd == "updateOtherPlayerGrade.spd":
+                        cmd, data = self.PlayerManager.handle_updateOtherPlayerGrade(params, characterID)
                     else:
                         logging.error("UNKNOWN CLIENT REQUEST")
                         logging.error("req %r" % req)
@@ -455,34 +293,6 @@ class Server(object):
 
         return 0x22, "\x00\x00\x00"
         
-    def handle_initializeCharacter(self, params):
-        characterID = params["characterID"]
-        index = params["index"]
-        
-        logging.info("Player %r logged in" % characterID)
-        
-        charname = characterID + index[0]
-        
-        data = charname + "\x00"
-        return 0x17, data
-        
-    def handle_qwcdata(self, cdata):
-        data = ""
-        #testparams = (0x5e, 0x81, 0x70, 0x7e, 0x7a, 0x7b, 0x00)
-        #testparams = (0xff, -0xff, -0xffff, -0xffffff, -0x7fffffff, 0, 0)
-        # 0 = dunno
-        # 1 = dunno
-        # 2 = boletarian palace
-        # 6 = Tower of Latria?
-        
-        testparams = list(int(x) for x in open("tendency.txt", "rb").read().strip().split())
-        logging.info("Tendency test %r" % testparams)
-        
-        for i in xrange(7):
-            data += struct.pack("<ii", testparams[i], 0)
-            
-        return 0x0e, data
-        
     def handle_getReplayList(self, cdata):
         params = get_params(cdata)
         blockID = make_signed(int(params["blockID"]))
@@ -504,10 +314,6 @@ class Server(object):
             
         return 0x1e, data
         
-# 'POST /cgi-bin/summonOtherCharacter.spd HTTP/1.1'
-# 'ghostID=1234564&NPRoomID=/////05YUlYFFQyAAAABAQAAAAAEgAAAAgEAAAAAAIAAAAYBAAAAAAAAAAAAAQAAACcVAAAAAQEAAABOJQAAAAIBAAAAdTUAAAADAQAAAJxFAAAABAEAAADDVQAAAAUBAAAA6m
-# UAAAAGAQAAARF1AAAABwEAAAE4hQAAAAgEAAB5AG0AZwB2AGUAAAB5AG0AZwB2AGUAAAAQAAAAAAAAAAAAAQACAAB8/Q===??&ver=100&\x00'
-
     def prepare_response(self, cmd, data):
         # The official servers were REALLY inconsistent with the data length field
         # I just set it to what seems to be the correct value and hope for the best,

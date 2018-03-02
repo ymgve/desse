@@ -2,6 +2,11 @@ import base64
 
 from Crypto.Cipher import AES
 
+SERVER_PORT_BOOTSTRAP = 18000
+SERVER_PORT_US = 18666
+SERVER_PORT_EU = 18667
+SERVER_PORT_JP = 18668
+
 blocknames = {}
 for line in open("data/blocknames.txt", "rb"):
     blockID, blockname = line.strip().split("|")

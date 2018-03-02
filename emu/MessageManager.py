@@ -1,4 +1,4 @@
-import cStringIO, logging, sqlite3, struct, os
+import cStringIO, logging, os, sqlite3, struct
 
 from emu.Util import *
 
@@ -176,7 +176,7 @@ class MessageManager(object):
         
         return 0x27, "\x01"
         
-    def handle_updateBloodMessageGrade(self, params):
+    def handle_updateBloodMessageGrade(self, params, server):
         bmID = int(params["bmID"])
         
         self.conn.execute("update messages set rating = rating + 1 where bmID = ?", (bmID,))
@@ -185,6 +185,8 @@ class MessageManager(object):
         row = self.conn.execute("select * from messages where bmID = ?", (bmID,)).fetchone()
         msg = Message()
         msg.from_db_row(row)
+        
+        server.PlayerManager.updateBloodMessageGrade(msg.characterID)
         
         logging.info("Recommended message %s" % str(msg))
         
