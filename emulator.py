@@ -524,7 +524,8 @@ class Server(object):
                 serverport = ready_server.getsockname()[1]
                 
                 client_sock, client_addr = ready_server.accept()
-                clientip = client_addr[0]
+                client_ip = client_addr[0]
+                
                 sc = ImpSock(client_sock, "client")
                 
                 req = sc.recv_line()
@@ -536,9 +537,6 @@ class Server(object):
                 cdata = decrypt(cdata)
                 sc.logpacket("decr data", cdata)
                 
-                if clientip not in self.players:
-                    self.players[clientip] = "unknown " + clientip
-                playerid = self.players[clientip]
                 
                 if serverport == SERVER_PORT_BOOTSTRAP:
                     data = open("info.ss", "rb").read()
@@ -547,8 +545,16 @@ class Server(object):
                     params = get_params(cdata)
                     clientcmd = req.split()[1].split("/")[-1]
                     
+                    if "characterID" in params:
+                        self.players[client_ip] = params["characterID"]
+                        
+                    if client_ip not in self.players:
+                        self.players[client_ip] = "[%s]" % client_ip
+                        
+                    playerid = self.players[client_ip]
+                    
                     if clientcmd == "login.spd":
-                        cmd, data = self.handle_login(params, clientip)
+                        cmd, data = self.handle_login(params)
                     elif clientcmd == "initializeCharacter.spd":
                         cmd, data = self.handle_initializeCharacter(params)
                     elif clientcmd == "getQWCData.spd":
@@ -560,9 +566,11 @@ class Server(object):
                     elif clientcmd == "getBloodMessageGrade.spd":
                         cmd, data = 0x29, "0100000000".decode("hex")
                     elif clientcmd == "getTimeMessage.spd":
-                        cmd, data = 0x22, "000000".decode("hex")
-                    elif clientcmd == "addReplayData.spd":
-                        cmd, data = 0x1d, "01000000".decode("hex")
+                        cmd, data = self.handle_getTimeMessage(params)
+                    elif clientcmd == "getAgreement.spd": # not observed in the wild, mostly guessing
+                        cmd, data = 0x01, "\x01\x01Hello!!\r\n\x00"
+                    elif clientcmd == "addNewAccount.spd": # not observed in the wild, doesn't really work
+                        cmd, data = 0x01, "\x01\x01Hello!!\r\n\x00"
                         
                     elif clientcmd == "getBloodMessage.spd":
                         cmd, data = self.MessageManager.handle_getBloodMessage(params)
@@ -577,6 +585,8 @@ class Server(object):
                         cmd, data = self.handle_getReplayList(cdata)
                     elif clientcmd == "getReplayData.spd":
                         cmd, data = self.handle_getReplayData(cdata)
+                    elif clientcmd == "addReplayData.spd":
+                        cmd, data = 0x1d, "01000000".decode("hex")
                         
                     elif clientcmd == "getWanderingGhost.spd":
                         cmd, data = self.GhostManager.handle_getWanderingGhost(params)
@@ -618,27 +628,41 @@ class Server(object):
                 tb = traceback.format_exc()
                 logging.error("Exception! Traceback:\n%s" % tb)
             
-    def handle_login(self, params, clientip):
-        NPID = params["NPID"]
-        rang = params["rang"]
-        self.players[clientip] = "%r %r" % (NPID, rang)
-        
-        total, blockslist = self.GhostManager.get_current_players()
+    def handle_login(self, params):
         motd  = "Welcome to ymgve's test server!\r\n"
         motd += "This is a temporary server, it will eventually be shut\r\n"
         motd += "down and its source code published.\r\n"
-        motd += "Current players online: %d\r\n" % total
-        motd += "Popular areas:\r\n"
+
+        total, blockslist = self.GhostManager.get_current_players()
+        motd2  = "Current players online: %d\r\n" % total
+        motd2 += "Popular areas:\r\n"
         for count, blockID in blockslist[::-1][0:5]:
-             motd += "%4d %s\r\n" % (count, blocknames[blockID])
+             motd2 += "%4d %s\r\n" % (count, blocknames[blockID])
              
-        return 0x01, "\x01\x01" + motd + "\x00"
+        # first byte
+        # 0x00 - present EULA, create account (not working)
+        # 0x01 - present MOTD, can be multiple
+        # 0x02 - "Your account is currently suspended."
+        # 0x03 - "Your account has been banned."
+        # 0x05 - undergoing maintenance
+        # 0x06 - online service has been terminated
+        # 0x07 - network play cannot be used with this version
+        
+        return 0x02, "\x01" + "\x02" + motd + "\x00" + motd2 + "\x00"
+        
+    def handle_getTimeMessage(self, params):
+        # first byte
+        # 0x00 - nothing
+        # 0x01 - undergoing maintenance
+        # 0x02 - online service has been terminated
+
+        return 0x22, "\x00\x00\x00"
         
     def handle_initializeCharacter(self, params):
         characterID = params["characterID"]
         index = params["index"]
         
-        logging.info("Character %r logged in" % characterID)
+        logging.info("Player %r logged in" % characterID)
         
         charname = characterID + index[0]
         
