@@ -3,6 +3,7 @@ from time import gmtime, strftime
 
 from emu.Util import *
 from emu.GhostManager import *
+from emu.MessageManager import *
 
 SERVER_PORT_BOOTSTRAP = 18000
 SERVER_PORT_US = 18666
@@ -264,139 +265,6 @@ class SOSManager(object):
             
         return 0x15, "\x01"
 
-class Message(object):
-    def __init__(self):
-        pass
-        
-    def unserialize(self, data):
-        sio = cStringIO.StringIO(data)
-        self.bmID = struct.unpack("<I", sio.read(4))[0]
-        self.characterID = readcstring(sio)
-        self.blockID, self.posx, self.posy, self.posz, self.angx, self.angy, self.angz = struct.unpack("<iffffff", sio.read(28))
-        self.messageID, self.mainMsgID, self.addMsgCateID, self.rating = struct.unpack("<iiii", sio.read(16))
-        assert sio.read() == ""
-        
-    def from_params(self, params, bmID):
-        self.bmID = bmID
-        self.characterID = params["characterID"]
-        self.blockID = make_signed(int(params["blockID"]))
-        self.posx = float(params["posx"])
-        self.posy = float(params["posy"])
-        self.posz = float(params["posz"])
-        self.angx = float(params["angx"])
-        self.angy = float(params["angy"])
-        self.angz = float(params["angz"])
-        self.messageID = int(params["messageID"])
-        self.mainMsgID = int(params["mainMsgID"])
-        self.addMsgCateID = int(params["addMsgCateID"])
-        self.rating = 0
-
-    def serialize(self):
-        res = ""
-        res += struct.pack("<I", self.bmID)
-        res += self.characterID + "\x00"
-        res += struct.pack("<iffffff", self.blockID, self.posx, self.posy, self.posz, self.angx, self.angy, self.angz)
-        res += struct.pack("<iiii", self.messageID, self.mainMsgID, self.addMsgCateID, self.rating)
-        return res
-
-    def __str__(self):
-        if self.mainMsgID in messageids:
-            if self.messageID in messageids:
-                extra = messageids[self.messageID]
-            else:
-                extra = "[%d]" % self.messageID
-                
-            message = messageids[self.mainMsgID].replace("***", extra)
-            prettymessage = "%8d %8s %-20r %s %d" % (self.bmID, blocknames[self.blockID], self.characterID, message, self.rating)
-            
-        else:
-            prettymessage = "%8d %8s %-20r [%d] [%d] %d" % (self.bmID, blocknames[self.blockID], self.characterID, self.messageID, self.mainMsgID, self.rating)
-
-        return prettymessage
-        
-class MessageManager(object):
-    def __init__(self):
-        self.blocks = {}
-        self.legacyblocks = {}
-        for blockID in blocknames:
-            self.blocks[blockID] = set()
-            self.legacyblocks[blockID] = set()
-            
-        self.messages = {}
-        
-        f = open("messagedata.bin", "rb")
-        while True:
-            data = f.read(4)
-            if len(data) == 0:
-                break
-            sz = struct.unpack("<I", data)[0]
-            
-            msg = Message()
-            msg.unserialize(f.read(sz))
-            
-            self.legacyblocks[msg.blockID].add(msg.bmID)
-            
-            self.messages[msg.bmID] = msg
-                
-        logging.info("Loaded initial messages")
-        
-        self.bmID = 1000000000
-        
-    def handle_getBloodMessage(self, params):
-        characterID = params["characterID"]
-        blockID = make_signed(int(params["blockID"]))
-        replayNum = int(params["replayNum"])
-        
-        to_send = []
-        # first get non-legacy messages
-        nummsg = min(replayNum, len(self.blocks[blockID]))
-        for bmID in random.sample(self.blocks[blockID], nummsg):
-            to_send.append(self.messages[bmID].serialize())
-            
-        numlegacy = min(replayNum - nummsg, len(self.legacyblocks[blockID]))
-        for bmID in random.sample(self.legacyblocks[blockID], numlegacy):
-            to_send.append(self.messages[bmID].serialize())
-        
-        res = struct.pack("<I", nummsg + numlegacy) + "".join(to_send)
-            
-        logging.debug("Sending %d messages and %d legacy messages" % (nummsg, numlegacy))
-        
-        return 0x1f, res
-        
-    def handle_addBloodMessage(self, params):
-        msg = Message()
-        msg.from_params(params, self.bmID)
-        self.bmID += 1
-        
-        self.messages[msg.bmID] = msg
-        self.blocks[msg.blockID].add(msg.bmID)
-        
-        logging.info("Added new message %s" % str(msg))
-        
-        return 0x1d, "\x01"
-        
-    def handle_deleteBloodMessage(self, params):
-        bmID = int(params["bmID"])
-        msg = self.messages[bmID]
-        
-        del self.messages[bmID]
-        if bmID in self.blocks[msg.blockID]:
-            self.blocks[msg.blockID].remove(bmID)
-        
-        logging.info("Deleted message %s" % str(msg))
-        
-        return 0x27, "\x01"
-        
-    def handle_updateBloodMessageGrade(self, params):
-        bmID = int(params["bmID"])
-        msg = self.messages[bmID]
-        
-        msg.rating += 1
-        
-        logging.info("Recommended message %s" % str(msg))
-        
-        return 0x2a, "\x01"
-        
 class Server(object):
     def __init__(self):
         self.GhostManager = GhostManager()
