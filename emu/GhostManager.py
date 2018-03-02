@@ -18,7 +18,7 @@ class GhostManager(object):
         
         for ghost in self.ghosts.values():
             if ghost.timestamp + 30.0 <= current_time:
-                print "deleted inactive ghost"
+                logging.debug("Deleted inactive ghost of %r" % ghost.characterID)
                 del self.ghosts[ghost.characterID]
     
     def handle_getWanderingGhost(self, params):

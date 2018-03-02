@@ -91,7 +91,7 @@ class PlayerManager(object):
         key = ("gradeS", "gradeA", "gradeB", "gradeC", "gradeD")[int(params["grade"])]
         self.conn.execute("update players set %s = %s + 1 where characterID = ?" % (key, key), (characterID,))
         self.conn.commit()
-        logging.info("Player %r gave player %r a %s rating" % (myCharacterID, characterID, gradetext))
+        logging.info("Player %r gave player %r a %s rating" % (myCharacterID, characterID, key))
         
         return 0x2b, "\x01"
     
