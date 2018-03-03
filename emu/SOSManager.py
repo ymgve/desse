@@ -152,7 +152,7 @@ class SOSManager(object):
         NPRoomID = params["NPRoomID"]
         logging.info("%r is attempting to summon for monk" % playerid)
         
-        for sos in self.activeSOS[serverport]: 
+        for sos in self.activeSOS[serverport].values(): 
             if sos.blockID in (40070, 40071, 40072, 40073, 40074, 40170, 40171, 40172, 40270):
                 logging.info("%r adds pending request for monk %r" % (playerid, sos))
                 self.monkPending[serverport][sos.characterID] = NPRoomID
