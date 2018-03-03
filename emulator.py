@@ -159,8 +159,6 @@ class Server(object):
                 sc = ImpSock(client_sock, "client")
                 
                 req = sc.recv_line()
-                logging.debug("got connect from %r to %r request %r" % (client_addr, serverport, req))
-                
                 clientheaders = sc.recv_headers()
                         
                 cdata = sc.recv_all(int(clientheaders["Content-Length"]))
@@ -169,19 +167,23 @@ class Server(object):
                 
                 
                 if serverport == SERVER_PORT_BOOTSTRAP:
+                    logging.debug("got bootstrap from %r to %r request %r" % (client_addr, serverport, req))
                     data = open("info.ss", "rb").read()
                     res = self.prepare_response_bootstrap(data)
                 else:
                     params = get_params(cdata)
                     clientcmd = req.split()[1].split("/")[-1]
                     
-                    if "characterID" in params:
+                    # updateOtherPlayerGrade contains the characterID of the other player, skip setting it as our own ID
+                    if "characterID" in params and clientcmd != "updateOtherPlayerGrade":
                         self.players[client_ip] = params["characterID"]
                         
                     if client_ip not in self.players:
                         self.players[client_ip] = "[%s]" % client_ip
                         
                     characterID = self.players[client_ip]
+                    
+                    logging.debug("got connect from %r to %r player %r request %r" % (client_addr, serverport, characterID, req))
                     
                     if clientcmd == "login.spd":
                         cmd, data = self.handle_login(params)
@@ -238,8 +240,7 @@ class Server(object):
                     elif clientcmd == "summonBlackGhost.spd":
                         cmd, data = self.SOSManager.handle_summonBlackGhost(params, serverport, characterID)
                     elif clientcmd == "initializeMultiPlay.spd":
-                        logging.info("Player %r started a multiplayer session successfully" % characterID)
-                        cmd, data = 0x15, "\x01"
+                        cmd, data = self.PlayerManager.handle_initializeMultiPlay(params)
                     elif clientcmd == "finalizeMultiPlay.spd":
                         cmd, data = self.PlayerManager.handle_finalizeMultiPlay(params)
                     elif clientcmd == "updateOtherPlayerGrade.spd":

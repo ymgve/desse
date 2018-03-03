@@ -33,6 +33,10 @@ class PlayerManager(object):
             self.conn.commit()
             logging.info("Created new player %r in database" % characterID)
     
+    def debug_db_row(self, characterID):
+        row = self.conn.execute("select * from players where characterID = ?", (characterID,)).fetchone()
+        logging.debug("Player info in db %r", row)
+    
     def handle_initializeCharacter(self, params):
         characterID = params["characterID"]
         index = params["index"]
@@ -40,6 +44,8 @@ class PlayerManager(object):
         
         self.ensure_user_created(characterID)
         logging.info("Player %r logged in" % characterID)
+        
+        self.debug_db_row(characterID)
         
         data = characterID + "\x00"
         return 0x17, data, characterID
@@ -54,12 +60,17 @@ class PlayerManager(object):
         for i in xrange(7):
             data += struct.pack("<ii", desired_tendency, 0)
             
+        logging.debug("Player %r with desired tendency %d" % (characterID, desired_tendency))
+        
         return 0x0e, data
     
     def handle_getMultiPlayGrade(self, params):
         characterID = params["NPID"]
         ratings = self.getPlayerStats(characterID)
         data = "\x01" + struct.pack("<iiiiii", *ratings)
+        
+        logging.debug("Player %r multiplayer stats %r" % (characterID, ratings))
+        
         return 0x28, data
         
     def handle_getBloodMessageGrade(self, params):
@@ -68,9 +79,25 @@ class PlayerManager(object):
         
         row = self.conn.execute("select messagerating from players where characterID = ?", (characterID,)).fetchone()
         messagerating = row[0]
+        
+        logging.debug("Player %r message rating %d" % (characterID, messagerating))
+        
         data = "\x01" + struct.pack("<i", messagerating)
         return 0x29, data
     
+    def handle_initializeMultiPlay(self, params):
+        characterID = params["characterID"]
+        self.ensure_user_created(characterID)
+    
+        self.conn.execute("update players set numsessions = numsessions + 1 where characterID = ?", (characterID,))
+        self.conn.commit()
+        
+        logging.info("Player %r started a multiplayer session successfully" % characterID)
+        
+        self.debug_db_row(characterID)
+        
+        return 0x15, "\x01"
+        
     def handle_finalizeMultiPlay(self, params):
         characterID = params["characterID"]
         self.ensure_user_created(characterID)
@@ -78,22 +105,27 @@ class PlayerManager(object):
         gradetext = "??no grade??"
         for key in ("gradeS", "gradeA", "gradeB", "gradeC", "gradeD"):
             if params[key] == "1":
-                self.conn.execute("update players set %s = %s + 1 and numsessions = numsessions + 1 where characterID = ?" % (key, key), (characterID,))
+                self.conn.execute("update players set %s = %s + 1 where characterID = ?" % (key, key), (characterID,))
                 self.conn.commit()
                 gradetext = key
                 break
 
         logging.info("Player %r finished a multiplayer session successfully and received %s" % (characterID, gradetext))
         
+        self.debug_db_row(characterID)
+        
         return 0x21, "\x01"
         
     def handle_updateOtherPlayerGrade(self, params, myCharacterID):
-        characterID = params["characterID"]
+        characterID = params["characterID"] + "0" # FOR SOME REASON ZERO ISN'T PRESENT HERE
         
         key = ("gradeS", "gradeA", "gradeB", "gradeC", "gradeD")[int(params["grade"])]
-        self.conn.execute("update players set %s = %s + 1 and numsessions = numsessions + 1 where characterID = ?" % (key, key), (characterID,))
+        self.conn.execute("update players set %s = %s + 1 where characterID = ?" % (key, key), (characterID,))
         self.conn.commit()
+        
         logging.info("Player %r gave player %r a %s rating" % (myCharacterID, characterID, key))
+        
+        self.debug_db_row(characterID)
         
         return 0x2b, "\x01"
     
@@ -106,4 +138,3 @@ class PlayerManager(object):
         c.execute("update players set messagerating = messagerating + 1 where characterID = ?", (characterID,)).fetchone()
         self.conn.commit()
         logging.info("Updated blood message grade for player %r, rows affected %d" % (characterID, c.rowcount))
-
