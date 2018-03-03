@@ -64,6 +64,8 @@ class PlayerManager(object):
         
     def handle_getBloodMessageGrade(self, params):
         characterID = params["NPID"]
+        self.ensure_user_created(characterID)
+        
         row = self.conn.execute("select messagerating from players where characterID = ?", (characterID,)).fetchone()
         messagerating = row[0]
         data = "\x01" + struct.pack("<i", messagerating)
@@ -76,7 +78,7 @@ class PlayerManager(object):
         gradetext = "??no grade??"
         for key in ("gradeS", "gradeA", "gradeB", "gradeC", "gradeD"):
             if params[key] == "1":
-                self.conn.execute("update players set %s = %s + 1 where characterID = ?" % (key, key), (characterID,))
+                self.conn.execute("update players set %s = %s + 1 and numsessions = numsessions + 1 where characterID = ?" % (key, key), (characterID,))
                 self.conn.commit()
                 gradetext = key
                 break
@@ -89,7 +91,7 @@ class PlayerManager(object):
         characterID = params["characterID"]
         
         key = ("gradeS", "gradeA", "gradeB", "gradeC", "gradeD")[int(params["grade"])]
-        self.conn.execute("update players set %s = %s + 1 where characterID = ?" % (key, key), (characterID,))
+        self.conn.execute("update players set %s = %s + 1 and numsessions = numsessions + 1 where characterID = ?" % (key, key), (characterID,))
         self.conn.commit()
         logging.info("Player %r gave player %r a %s rating" % (myCharacterID, characterID, key))
         
