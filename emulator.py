@@ -46,6 +46,7 @@ class ImpSock(object):
         self.sc = sc
         self.name = name
         self.recvdata = ""
+        self.sc.settimeout(10)
         
     def recv(self, sz):
         data = self.sc.recv(sz)
