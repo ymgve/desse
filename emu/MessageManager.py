@@ -131,7 +131,7 @@ class MessageManager(object):
         # then legacy messages
         remaining = replayNum - len(to_send)
         num_legacy = 0
-        if remaining > 0:
+        if (num_own + num_others) < LEGACY_MESSAGE_THRESHOLD and remaining > 0:
             for row in self.conn.execute("select * from messages where blockID = ? and legacy = 1 order by random() limit ?", (blockID, remaining)):
                 msg = Message()
                 msg.from_db_row(row)

@@ -169,7 +169,7 @@ class Server(object):
                     elif clientcmd == "getReplayData.spd":
                         cmd, data = self.ReplayManager.handle_getReplayData(params)
                     elif clientcmd == "addReplayData.spd":
-                        cmd, data = 0x1d, "01000000".decode("hex")
+                        cmd, data = self.ReplayManager.handle_addReplayData(params)
                         
                     elif clientcmd == "getWanderingGhost.spd":
                         cmd, data = self.GhostManager.handle_getWanderingGhost(params)
