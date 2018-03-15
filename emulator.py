@@ -6,6 +6,7 @@ from emu.Util import *
 from emu.GhostManager import *
 from emu.MessageManager import *
 from emu.PlayerManager import *
+from emu.ReplayManager import *
 from emu.SOSManager import *
 
 logging.basicConfig(level=logging.DEBUG,
@@ -16,30 +17,6 @@ stream_handler = logging.StreamHandler()
 stream_handler.setLevel(logging.INFO)
 
 logging.getLogger("").addHandler(stream_handler)
-
-class ReplayHeader(object):
-    def __init__(self):
-        pass
-        
-    def create(self, sio):
-        ghostID = sio.read(4)
-        if len(ghostID) != 4:
-            return False
-            
-        self.ghostID = struct.unpack("<I", ghostID)[0]
-        
-        self.name = readcstring(sio)
-        self.data = sio.read(40)
-        
-        self.blockID, self.posx, self.posy, self.posz, self.angx, self.angy, self.angz, self.messageID, self.mainMsgID, self.addMsgCateID = struct.unpack("<iffffffIII", self.data)
-        
-        return True
-        
-    def to_bin(self):
-        res = struct.pack("<I", self.ghostID)
-        res += self.name + "\x00"
-        res += self.data
-        return res
 
 class ImpSock(object):
     def __init__(self, sc, name):
@@ -105,38 +82,9 @@ class Server(object):
         self.MessageManager = MessageManager()
         self.SOSManager = SOSManager()
         self.PlayerManager = PlayerManager()
-        self.replayheaders = {}
-        self.replaydata = {}
+        self.ReplayManager = ReplayManager()
         self.players = {}
         
-        f = open("replayheaders.bin", "rb")
-        while True:
-            header = ReplayHeader()
-            res = header.create(f)
-            if not res:
-                break
-                
-            if header.blockID not in self.replayheaders:
-                self.replayheaders[header.blockID] = []
-                
-            if (header.messageID, header.mainMsgID, header.addMsgCateID) != (0, 0, 0):
-                self.replayheaders[header.blockID].append(header)
-                
-        logging.info("Finished reading replay headers")
-        
-        f = open("replaydata.bin", "rb")
-        while True:
-            ghostID = f.read(4)
-            if len(ghostID) != 4:
-                break
-            ghostID = struct.unpack("<I", ghostID)[0]
-            
-            data = readcstring(f)
-            
-            self.replaydata[ghostID] = data
-            
-        logging.info("Finished reading replay data")
-                
     def run(self):
         servers = []
         for port in (SERVER_PORT_BOOTSTRAP, SERVER_PORT_US, SERVER_PORT_EU, SERVER_PORT_JP):
@@ -217,9 +165,9 @@ class Server(object):
                         cmd, data = self.MessageManager.handle_deleteBloodMessage(params)
                         
                     elif clientcmd == "getReplayList.spd":
-                        cmd, data = self.handle_getReplayList(cdata)
+                        cmd, data = self.ReplayManager.handle_getReplayList(params)
                     elif clientcmd == "getReplayData.spd":
-                        cmd, data = self.handle_getReplayData(cdata)
+                        cmd, data = self.ReplayManager.handle_getReplayData(params)
                     elif clientcmd == "addReplayData.spd":
                         cmd, data = 0x1d, "01000000".decode("hex")
                         
@@ -298,27 +246,6 @@ class Server(object):
         # 0x02 - online service has been terminated
 
         return 0x22, "\x00\x00\x00"
-        
-    def handle_getReplayList(self, cdata):
-        params = get_params(cdata)
-        blockID = make_signed(int(params["blockID"]))
-        replayNum = int(params["replayNum"])
-        
-        data = struct.pack("<I", replayNum)
-        for i in xrange(replayNum):
-            header = random.choice(self.replayheaders[blockID])
-            data += header.to_bin()
-            
-        return 0x1f, data
-        
-    def handle_getReplayData(self, cdata):
-        params = get_params(cdata)
-        ghostID = int(params["ghostID"])
-        
-        ghostdata = self.replaydata[ghostID]
-        data = struct.pack("<II", ghostID, len(ghostdata)) + ghostdata
-            
-        return 0x1e, data
         
     def prepare_response(self, cmd, data):
         # The official servers were REALLY inconsistent with the data length field
