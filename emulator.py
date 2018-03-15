@@ -187,7 +187,7 @@ class Server(object):
                     logging.debug("got connect from %r to %r player %r request %r" % (client_addr, serverport, characterID, req))
                     
                     if clientcmd == "login.spd":
-                        cmd, data = self.handle_login(params)
+                        cmd, data = self.handle_login(params, serverport)
                     elif clientcmd == "initializeCharacter.spd":
                         cmd, data, characterID = self.PlayerManager.handle_initializeCharacter(params)
                         self.players[client_ip] = characterID
@@ -226,7 +226,7 @@ class Server(object):
                     elif clientcmd == "getWanderingGhost.spd":
                         cmd, data = self.GhostManager.handle_getWanderingGhost(params)
                     elif clientcmd == "setWanderingGhost.spd":
-                        cmd, data = self.GhostManager.handle_setWanderingGhost(params)
+                        cmd, data = self.GhostManager.handle_setWanderingGhost(params, serverport)
                         
                     elif clientcmd == "getSosData.spd":
                         cmd, data = self.SOSManager.handle_getSosData(params, serverport)
@@ -265,14 +265,18 @@ class Server(object):
                 tb = traceback.format_exc()
                 logging.error("Exception! Traceback:\n%s" % tb)
             
-    def handle_login(self, params):
+    def handle_login(self, params, serverport):
         motd  = "Welcome to ymgve's test server!\r\n"
-        motd += "This is a temporary server, it will eventually be shut\r\n"
-        motd += "down and its source code published.\r\n"
+        motd += "This is a temporary server, it will\r\n"
+        motd += "eventually be shut down.\r\n\r\n"
+        motd += "source code:\r\n"
+        motd += "https://github.com/ymgve/desse\r\n"
+        
 
-        total, blockslist = self.GhostManager.get_current_players()
-        motd2  = "Current players online: %d\r\n" % total
-        motd2 += "Popular areas:\r\n"
+        regiontotal, blockslist = self.GhostManager.get_current_players(serverport)
+        motd2  = "Current players online: %d\r\n" % sum(regiontotal.values())
+        motd2 += "US %d  EU %d  JP %d\r\n" % (regiontotal[SERVER_PORT_US], regiontotal[SERVER_PORT_EU], regiontotal[SERVER_PORT_JP])
+        motd2 += "Popular areas in your region:\r\n"
         for count, blockID in blockslist[::-1][0:5]:
              motd2 += "%4d %s\r\n" % (count, blocknames[blockID])
              

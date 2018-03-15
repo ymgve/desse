@@ -43,7 +43,7 @@ class GhostManager(object):
 
         return 0x11, res
         
-    def handle_setWanderingGhost(self, params):
+    def handle_setWanderingGhost(self, params, serverport):
         characterID = params["characterID"]
         ghostBlockID = make_signed(int(params["ghostBlockID"]))
         replayData = decode_broken_base64(params["replayData"])
@@ -60,6 +60,7 @@ class GhostManager(object):
                 logging.debug("Player %r spawned into %s" % (characterID, blocknames[ghostBlockID]))
                 
             self.ghosts[characterID] = ghost
+            self.ghosts[characterID].serverport = serverport
         
         return 0x17, "\x01"
     
@@ -86,18 +87,23 @@ class GhostManager(object):
             logging.warning("bad ghost data %r %r\n%s" % (replayData, data, tb))
             return False
 
-    def get_current_players(self):
+    def get_current_players(self, serverport):
         blocks = {}
-        total = 0
+        regiontotal = {}
+        regiontotal[SERVER_PORT_US] = 0
+        regiontotal[SERVER_PORT_EU] = 0
+        regiontotal[SERVER_PORT_JP] = 0
         
         self.kill_stale_ghosts()
         
         for ghost in self.ghosts.values():
-            if ghost.ghostBlockID not in blocks:
-                blocks[ghost.ghostBlockID] = 0
-            blocks[ghost.ghostBlockID] += 1
-            total += 1
+            regiontotal[ghost.serverport] += 1
+            
+            if ghost.serverport == serverport:
+                if ghost.ghostBlockID not in blocks:
+                    blocks[ghost.ghostBlockID] = 0
+                blocks[ghost.ghostBlockID] += 1
                 
         blockslist = sorted((v, k) for (k, v) in blocks.items())
-        logging.debug("Total players %d %r" % (total, blockslist))
-        return total, blockslist
+        logging.debug("Total players %r %r" % (regiontotal, blockslist))
+        return regiontotal, blockslist
