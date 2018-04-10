@@ -3,10 +3,10 @@ DeSSE - Demon's Souls Server Emulator
 This is a very quick and dirty server emulator that supports the most basic features.
 Working at the moment:
 
- - matchmaking (only internally in each region, EU/US people won't see each other's summon signs for example)
+ - matchmaking (only internally in each region, EU/US/JP people won't see each other's summon signs for example)
  - messages, pre-seeded with some old EU messages, but new messages have priority
  - ghosts
- - bloodstains, only pre-seeded with old EU stains, new stains not supported yet
+ - bloodstains, pre-seeded with some old EU stains, new stains have priority
  
 The matchmaking only works by virtue of Sony's matchmaking servers being online. I don't know
 if these servers are generic and will continue working in the future or if they might
